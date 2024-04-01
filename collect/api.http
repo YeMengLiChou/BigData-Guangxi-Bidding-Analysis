@@ -1,0 +1,55 @@
+# 地区代码
+# districtCode: 区域代码
+# queryWithCode: 是否包含区域代码
+# timestamp: 时间戳
+GET /api/core/remote/announcementDistrict
+    ?includeSelf=false
+    &districtCode=450100
+    &queryWithCode=true
+    &includeAllNode=true
+    &filterNotActive=true
+    &timestamp=1708259649 HTTP/1.1
+Accept: application/json, text/plain, */*
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+Host: www.ccgp-guangxi.gov.cn
+###
+
+# 获取 结果公告 数据的 api
+POST /portal/category HTTP/1.1
+Accept: application/json, text/plain, */*
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+Host: www.ccgp-guangxi.gov.cn
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0
+Content-Type: application/json;charset=UTF-8
+
+{
+  "pageNo":1,
+  "pageSize":15,
+  "publishDateBegin":  "2022-01-01",
+  "publishDateEnd": "2022-01-05",
+  "categoryCode":"ZcyAnnouncement2",
+  "_t":1708177035000
+}
+###
+# pageNo: 页码编号
+# pageSize: 每页显示的条数
+# categoryCode: 公告类型
+# _t: 时间戳
+###
+
+
+# 获取 公告详情 数据的 api
+# articleId: 公告编号
+# parentId: (非必需）
+# timestamp: 时间戳（非必需）
+GET /portal/detail
+    ?articleId=j3fGSjOb9%2Bs2L57ar0Y%2FMQ%3D%3D
+    &parentId=66485
+    &timestamp=1708359846 HTTP/1.1
+Accept: application/json, text/plain, */*
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
+Host: www.ccgp-guangxi.gov.cn
+###

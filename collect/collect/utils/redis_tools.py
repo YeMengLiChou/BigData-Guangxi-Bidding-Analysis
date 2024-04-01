@@ -1,0 +1,3 @@
+
+class RedisCache(object):
+    pass
