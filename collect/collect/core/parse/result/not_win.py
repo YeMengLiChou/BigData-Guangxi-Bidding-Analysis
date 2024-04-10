@@ -3,6 +3,9 @@ import re
 
 from collect.collect.core.parse import AbstractFormatParser
 from collect.collect.middlewares import ParseError
+from collect.collect.utils import (
+    symbol_tools as sym
+)
 from contant import constants
 
 logger = logging.getLogger(__name__)
@@ -37,27 +40,32 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
     def parse_review_expert(part: list[str]) -> dict:
         data = dict()
         dist = part[-1]
-        if "，" in dist:
-            split_symbol = "，"
-        elif "、" in dist:
-            split_symbol = "、"
-        else:
-            split_symbol = ","
+
+        split_symbol = sym.get_symbol(dist, [",", "，", "、"])
         persons = dist.split(split_symbol)
         review_experts = []
         for person in persons:
+            # 采购人代表
             if "采购人代表" in persons:
-                left_bracket_symbol = "(" if "(" in person else "（"
-                right_bracket_symbol = ")" if left_bracket_symbol == "(" else "）"
-                idx = person.index(left_bracket_symbol)
-                if idx == 0:
-                    idx = person.rindex(right_bracket_symbol)
-                    representor = person[idx + 1:]
+                l, r = sym.get_parentheses_position(person)
+                if l != -1 and r != -1:
+                    if l == 0:
+                        # 名字在括号的右边
+                        representor = persons[r + 1:]
+                    elif r == len(persons) - 1:
+                        # 名字在括号的左边
+                        representor = persons[:l]
+                    else:
+                        raise ParseError(
+                            msg="评审专家解析部分-采购人部分出现特殊情况", content=part
+                        )
                 else:
-                    representor = person[:idx]
-                data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representor
-                review_experts.append(representor)
+                    raise ParseError(
+                        msg="评审专家解析部分-采购人部分出现特殊情况", content=part
+                    )
             else:
+                if person == '/':
+                    continue
                 review_experts.append(persons)
         data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
         return data
@@ -71,7 +79,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         bid_items = []
         data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
         for p in part:
-            match = re.match(".*分标([0-9]):(.*)", p)
+            match = re.match(".*(分标|标项)([0-9]):(.*)", p)
             if match:
                 index, reason = match.group(1), match.group(2)
                 bid_items.append({
