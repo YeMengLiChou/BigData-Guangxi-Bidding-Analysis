@@ -1,4 +1,6 @@
-__filter_rules = [
+__all__ = ["filter_texts", "startswith_chinese_number", "startswith_number_index"]
+
+filter_rules = [
     lambda text: isinstance(text, str),
     lambda text: len(text) > 0,  # 过滤空字符串
     lambda text: text not in ['"', "“", "”", "\\n"],  # 过滤双引号、转义回车符
@@ -6,8 +8,7 @@ __filter_rules = [
     not in text,
 ]
 
-__chinese_number = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
-__chinese_number_mapper = {
+chinese_number_mapper = {
     "零": 0,
     "一": 1,
     "二": 2,
@@ -19,7 +20,19 @@ __chinese_number_mapper = {
     "八": 8,
     "九": 9,
     "十": 10,
+    "十一": 11,
+    "十二": 12,
+    "十三": 13,
+    "十四": 14,
+    "十五": 15,
+    "十六": 16,
+    "十七": 17,
+    "十八": 18,
+    "十九": 19,
+    "二十": 20,
 }
+
+chinese_numbers: list = list(chinese_number_mapper.keys())
 
 
 def filter_texts(texts: list, rules=None):
@@ -30,7 +43,7 @@ def filter_texts(texts: list, rules=None):
     :return:
     """
     if rules is None:
-        rules = __filter_rules
+        rules = filter_rules
     for rule in rules:
         result = list(filter(rule, texts))
         del texts
@@ -40,13 +53,14 @@ def filter_texts(texts: list, rules=None):
 
 def startswith_chinese_number(text: str) -> int:
     """
-    判断text是否为 “中文数字、” 开头
+    判断text是否为 “中文数字、” 开头，最多匹配到 20
     :param text:
     :return:
     """
-    if len(text) < 2 or text[1] != "、":
+    idx = text.find('、')
+    if idx == -1:
         return -1
-    return __chinese_number_mapper.get(text[0], -1)
+    return chinese_number_mapper.get(text[:idx], -1)
 
 
 def startswith_number_index(text: str) -> int:
@@ -55,6 +69,9 @@ def startswith_number_index(text: str) -> int:
     :param text:
     :return:
     """
-    if len(text) < 2 or text[1] != ".":
+    if len(text) == 0:
         return -1
-    return int(text[0])
+    idx = text.find(".")
+    if (idx == -1) or (not text[0].isdigit()):
+        return -1
+    return int(text[:idx])

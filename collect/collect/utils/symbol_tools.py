@@ -39,3 +39,14 @@ def get_parentheses_position(s: str) -> tuple[int, int]:
         return s.find("（"), s.find("）")
     else:
         return -1, -1
+
+
+
+def endswith_colon_symbol(s: str) -> bool:
+    """
+    判断字符串是否以冒号结尾
+    :param s:
+    :return:
+    """
+    s = s.strip()
+    return s.endswith("：") or s.endswith(":")

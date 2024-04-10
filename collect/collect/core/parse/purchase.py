@@ -9,7 +9,10 @@ from collect.collect.core.parse import (
     common,
     AbstractFormatParser
 )
-from collect.collect.utils import log
+from collect.collect.utils import (
+    log,
+    symbol_tools as sym
+)
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
 from contant import constants
@@ -47,9 +50,6 @@ class StandardFormatParser(AbstractFormatParser):
                 f"{log.get_function_name()} started"
             )
 
-        def check_endswith_colon(s: str) -> bool:
-            return s.endswith(":") or s.endswith("：")
-
         def get_colon_symbol(s: str) -> str:
             if s.endswith(":"):
                 return ":"
@@ -65,12 +65,10 @@ class StandardFormatParser(AbstractFormatParser):
             return s.startswith("项目名称")
 
         def check_bid_item_quantity(s: str) -> bool:
-            endswith_colon = check_endswith_colon(s)
-            return s.startswith("数量") and endswith_colon
+            return s.startswith("数量") and sym.endswith_colon_symbol(s)
 
         def check_bid_item_budget(s: str) -> bool:
-            endswith_colon = check_endswith_colon(s)
-            return s.startswith("预算金额") and endswith_colon
+            return s.startswith("预算金额") and sym.endswith_colon_symbol(s)
 
         def complete_purchase_bid_item(item: dict) -> dict:
             """
@@ -92,7 +90,7 @@ class StandardFormatParser(AbstractFormatParser):
                 text = part[idx]
                 # 项目编号
                 if check_project_code(text):
-                    if not check_endswith_colon(text):
+                    if not sym.endswith_colon_symbol(text):
                         colon_symbol = get_colon_symbol(text)
                         project_code = text.split(colon_symbol)[-1]
                         idx += 1
@@ -102,7 +100,7 @@ class StandardFormatParser(AbstractFormatParser):
                     data[constants.KEY_PROJECT_CODE] = project_code
                 # 项目名称
                 elif check_project_name(text):
-                    if not check_endswith_colon(text):
+                    if not sym.endswith_colon_symbol(text):
                         colon_symbol = get_colon_symbol(text)
                         project_name = text.split(colon_symbol)[-1]
                         idx += 1
@@ -169,12 +167,12 @@ class StandardFormatParser(AbstractFormatParser):
             return common.startswith_number_index(s) >= 1
 
         def check_name(s: str) -> bool:
-            startswith_name = s.startswith("名称") or (s.find("名") < s.find("称"))
+            startswith_name = s.startswith("名") or (s.find("名") < s.find("称"))
             endswith_colon = s.endswith(":") or s.endswith("：")
             return startswith_name and endswith_colon
 
         def check_address(s: str) -> bool:
-            startswith_address = s.startswith("地址") or (s.find("地") < s.find("址"))
+            startswith_address = s.startswith("地") or (s.find("地") < s.find("址"))
             endswith_colon = s.endswith(":") or s.endswith("：")
             return startswith_address and endswith_colon
 
@@ -227,7 +225,7 @@ class StandardFormatParser(AbstractFormatParser):
                         data[constants.KEY_PURCHASER_AGENCY_INFORMATION] = info
                 else:
                     idx += 1
-                    return data
+            return data
         finally:
             if _DEBUG:
                 logger.debug(
@@ -269,7 +267,7 @@ def parse_html(html_content: str):
             # 找以 “一、” 这种格式开头的字符串
             index = common.startswith_chinese_number(result[idx])
             if index != -1:
-                result[idx] = result[idx][2:]  # 去掉前面的序号
+                result[idx] = result[idx][result[idx].index('、') + 1:]  # 去掉前面的序号
                 if not check_useful_part(title=result[idx]):
                     continue
                 pre = idx  # 开始部分
@@ -288,8 +286,6 @@ def parse_html(html_content: str):
             )
 
     parts_length = len(parts)
-    print('\n'.join(result))
-    # print("---\n".join(['\n'.join(part) for part in parts]))
     try:
         if parts_length >= 2:
             return _parse(parts, parser=StandardFormatParser)
@@ -325,6 +321,7 @@ def _parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
         if is_project_base_situation(title):
             data.update(parser.parse_project_base_situation(part))
         elif is_project_contact(title):
+            print(title)
             data.update(parser.parse_project_contact(part))
     return data
 
