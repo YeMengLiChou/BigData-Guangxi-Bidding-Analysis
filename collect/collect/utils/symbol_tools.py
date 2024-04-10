@@ -14,7 +14,6 @@ def get_comma_symbol(s: str) -> Union[str, None]:
         return None
 
 
-
 def get_symbol(s: str, coordinators: list[str]) -> Union[str, None]:
     """
     从 coordinators 中获取 s 中存在的符号

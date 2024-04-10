@@ -154,8 +154,7 @@ def parse_html(html_content: str, is_wid_bid: bool):
     finally:
         if _DEBUG:
             logger.debug(
-                f"DEBUG INFO: {log.get_function_name()} finished\n"
-                f"DEBUG INFO: running time: {time.time() - start_time}"
+                f"DEBUG INFO: {log.get_function_name()} finished, running: {time.time() - start_time}\n"
             )
 
 
