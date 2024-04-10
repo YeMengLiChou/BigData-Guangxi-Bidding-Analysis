@@ -1,5 +1,7 @@
 __all__ = ["filter_texts", "startswith_chinese_number", "startswith_number_index"]
 
+from lxml import etree
+
 filter_rules = [
     lambda text: isinstance(text, str),
     lambda text: len(text) > 0,  # 过滤空字符串
@@ -49,6 +51,20 @@ def filter_texts(texts: list, rules=None):
         del texts
         texts = result
     return texts
+
+
+def parse_html(html_content: str) -> list[str]:
+    """
+    解析html，返回文本列表
+    :param html_content:
+    :return:
+    """
+    html = etree.HTML(html_content)
+    # 找出所有的文本，并且进行过滤
+    text_list = [text.strip() for text in html.xpath("//text()")]
+    return filter_texts(text_list)
+
+
 
 
 def startswith_chinese_number(text: str) -> int:
