@@ -6,7 +6,7 @@ from collect.collect.core.api import POSTBaseApi
 
 class CategoryApi(POSTBaseApi):
 
-    base_url = "https://www.ccgp-guangxi.gov.cn/portal/category"
+    base_url = "http://www.ccgp-guangxi.gov.cn/portal/category"
 
     @staticmethod
     def generate_body(

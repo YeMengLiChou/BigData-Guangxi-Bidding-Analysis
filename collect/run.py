@@ -91,10 +91,10 @@ def configure_logging(settings: Settings):
             fmt=log_format,
             milliseconds=True,
             level_styles={
-                'critical': {'color': 9, },
+                'critical': {'color': 9},
                 'error': {'color': 1},
-                'warn': {'color': 3},
-                'info': {'color': 250, },
+                'warn': {'color': 11},
+                'info': {'color': 250},
                 'debug': {'color': 117},
             },
             field_styles={

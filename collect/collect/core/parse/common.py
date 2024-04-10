@@ -1,24 +1,24 @@
-
 __filter_rules = [
     lambda text: isinstance(text, str),
     lambda text: len(text) > 0,  # 过滤空字符串
-    lambda text: text not in ["\"", "“", "”", "\\n"],  # 过滤双引号、转义回车符
-    lambda text: "th, td {\n    border: 1px solid #DDD;\n    padding: 5px 10px;\n}" not in text,
+    lambda text: text not in ['"', "“", "”", "\\n"],  # 过滤双引号、转义回车符
+    lambda text: "th, td {\n    border: 1px solid #DDD;\n    padding: 5px 10px;\n}"
+    not in text,
 ]
 
-__chinese_number = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+__chinese_number = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 __chinese_number_mapper = {
-    '零': 0,
-    '一': 1,
-    '二': 2,
-    '三': 3,
-    '四': 4,
-    '五': 5,
-    '六': 6,
-    '七': 7,
-    '八': 8,
-    '九': 9,
-    '十': 10
+    "零": 0,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
 }
 
 
@@ -44,7 +44,7 @@ def startswith_chinese_number(text: str) -> int:
     :param text:
     :return:
     """
-    if len(text) < 2 or text[1] != '、':
+    if len(text) < 2 or text[1] != "、":
         return -1
     return __chinese_number_mapper.get(text[0], -1)
 
@@ -55,7 +55,6 @@ def startswith_number_index(text: str) -> int:
     :param text:
     :return:
     """
-    if len(text) < 2 or text[1] != '.':
+    if len(text) < 2 or text[1] != ".":
         return -1
     return int(text[0])
-

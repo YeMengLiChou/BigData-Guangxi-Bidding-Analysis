@@ -1,12 +1,11 @@
-import urllib
-
+from urllib.parse import quote
 from collect.collect.core.api import GETBaseApi
 from collect.collect.utils import time
 
 
 class DetailApi(GETBaseApi):
 
-    base_url = "https://www.ccgp-guangxi.gov.cn/portal/detail"
+    base_url = "http://www.ccgp-guangxi.gov.cn/portal/detail"
 
     @staticmethod
     def get_complete_url(
@@ -22,6 +21,6 @@ class DetailApi(GETBaseApi):
         :return:
         """
         return (f"{DetailApi.base_url}"
-                f"?articleId={urllib.parse.quote(articleId)}"
+                f"?articleId={quote(articleId)}"
                 f"&parentId={parentId}"
                 f"&timestamp={timestamp}")

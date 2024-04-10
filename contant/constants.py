@@ -2,10 +2,30 @@
 #
 #
 
+
+# ===================== Constants Value =====================
+
 BID_ITEM_QUANTITY_UNLIMITED = -1
 """
 标项-数量没有限制，关键字：不限
 """
+
+BID_ITEM_QUANTITY_UNCLEAR = 0
+"""
+标项-数量不明确
+"""
+
+BID_ITEM_QUANTITY_NOT_DEAL = -2
+"""
+标项-数量没有成交，即废标
+"""
+
+BID_ITEM_AMOUNT_NOT_DEAL = -1
+"""
+标项-金额没有成交，即废标
+"""
+
+# ===================== Scrapy Item Key =====================
 
 KEY_PROJECT_NAME = "project_name"
 """

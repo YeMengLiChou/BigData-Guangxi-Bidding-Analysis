@@ -1,4 +1,8 @@
+# python version 3.10.7
 scrapy==2.11.1
 scrapy-redis==0.7.3
-dynaconf==3.2.5
-colorslogger==15.0.1
+dynaconf==3.2.5  # config
+coloredlogs==15.0.1  # colorful logs
+redis==5.0.3  # cache database
+black==24.3.0  # code reformat
+confluent-kafka==2.3.0  # kafka python api

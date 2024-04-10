@@ -1,15 +1,4 @@
-"""
-dynaconf import configuration
-    scrapy 运行时的环境路径为当前路径，不包括 config 的路径，因此需要将 config 加入路径才能保证运行;
-    这里是将项目的根目录加入到 sys 的 path 中
-"""
-import sys
-import os
 
-# scrapy_path = sys.path[-1]
-# root_path = os.path.split(scrapy_path)[0]
-# sys.path.append(root_path)
-from config.config import settings  # import dynaconf settings
 
 BOT_NAME = "collect"
 
@@ -23,12 +12,16 @@ NEWSPIDER_MODULE = "collect.spiders"
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-# CONCURRENT_REQUESTS = 32
+CONCURRENT_REQUESTS = 32
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-# DOWNLOAD_DELAY = 3
+DOWNLOAD_DELAY = 2
+
+DOWNLOAD_TIMEOUT = 30
+
+CONCURRENT_ITEMS = 100
 # The download delay setting will honor only one of:
 # CONCURRENT_REQUESTS_PER_DOMAIN = 16
 # CONCURRENT_REQUESTS_PER_IP = 16
@@ -48,15 +41,16 @@ ROBOTSTXT_OBEY = False
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 SPIDER_MIDDLEWARES = {
-    "collect.middlewares.AnnouncementFilterMiddleware": 543,
-    "collect.middlewares.ParseErrorHandlerMiddleware": 543,
+    "collect.middlewares.ParseErrorHandlerMiddleware": 1,
 }
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
+    "collect.middlewares.AnnouncementFilterMiddleware": 12,
     "collect.middlewares.UserAgentMiddleware": 100,
     "collect.middlewares.ResponseDebugMiddleware": 100,
+    'scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware': 500,
 }
 
 # Enable or disable extensions
@@ -67,9 +61,11 @@ DOWNLOADER_MIDDLEWARES = {
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-# ITEM_PIPELINES = {
-#    "data_scrapy.pipelines.DataScrapyPipeline": 300,
-# }
+ITEM_PIPELINES = {
+    "collect.pipelines.CollectKafkaPipeline": 300,
+    "collect.pipelines.DebugPipeline": 200,
+    # "collect.pipelines.UpdateRedisInfoPipeline": 200,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
@@ -97,7 +93,15 @@ REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
+# ======== ResponseDebugMiddleware =================
 # 是否设置 ResponseDebugMiddleware 的调试
 RESPONSE_DEBUG = True
 
+RESPONSE_DEBUG_LOG_DIR = "logs"
+
 RESPONSE_PRE_CLEAR = True
+
+# ======== ParseErrorHandlerMiddleware =============
+PARSE_ERROR_LOG_DIR = "logs"
+
+PARSE_ERROR_CONTAINS_RESPONSE_BODY = False

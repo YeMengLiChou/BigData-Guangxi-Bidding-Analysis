@@ -1,11 +1,16 @@
 import json
-from abc import ABC
+import logging
 from typing import Type
+
 from lxml import etree
-from collect.collect.core.parse import common
+
 from collect.collect.core.parse import AbstractFormatParser
-from contant import constants
+from collect.collect.core.parse import common
+from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
+from contant import constants
+
+logger = logging.getLogger(__name__)
 
 
 class StandardFormatParser(AbstractFormatParser):
@@ -21,47 +26,98 @@ class StandardFormatParser(AbstractFormatParser):
         :return:
         """
 
+        def check_endswith_colon(s: str) -> bool:
+            return s.endswith(":") or s.endswith("：")
+
+
+        def get_colon_symbol(s: str) -> str:
+            if s.endswith(":"):
+                return ":"
+            if s.endswith("："):
+                return "："
+            raise ParseError(msg="不以：或: 作为标志符", content=[s])
+
+        def check_project_code(s: str) -> bool:
+            return s.startswith("项目编号")
+
+        def check_project_name(s: str) -> bool:
+
+            return s.startswith("项目名称")
+
         def check_bid_item_quantity(s: str) -> bool:
-            endswith_colon = s.endswith(":") or s.endswith("：")
+            endswith_colon = check_endswith_colon(s)
             return s.startswith("数量") and endswith_colon
 
         def check_bid_item_budget(s: str) -> bool:
-            endswith_colon = s.endswith(":") or s.endswith("：")
+            endswith_colon = check_endswith_colon(s)
             return s.startswith("预算金额") and endswith_colon
 
-        data = dict()
-        bid_items = []
+        def complete_purchase_bid_item(item: dict) -> dict:
+            """
+            完善标项信息
+            :param item:
+            :return:
+            """
+            if not bid_item.get(constants.KEY_BID_ITEM_QUANTITY, None):
+                bid_item[constants.KEY_BID_ITEM_QUANTITY] = (
+                    constants.BID_ITEM_QUANTITY_UNCLEAR
+                )
+            return item
+
+        data, bid_items = dict(), []
         n, idx = len(part), 0
+        bid_item_index = 1
         while idx < n:
             text = part[idx]
+            # 项目编号
+            if check_project_code(text):
+                if not check_endswith_colon(text):
+                    colon_symbol = get_colon_symbol(text)
+                    project_code = text.split(colon_symbol)[-1]
+                    idx += 1
+                else:
+                    project_code = part[idx + 1]
+                    idx += 2
+                data[constants.KEY_PROJECT_CODE] = project_code
+            # 项目名称
+            elif check_project_name(text):
+                if not check_endswith_colon(text):
+                    colon_symbol = get_colon_symbol(text)
+                    project_name = text.split(colon_symbol)[-1]
+                    idx += 1
+                else:
+                    project_name = part[idx + 1]
+                    idx += 2
+                data[constants.KEY_PROJECT_NAME] = project_name
             # 总预算
-            if "预算总金额" in text:
+            elif "预算总金额" in text:
                 budget = float(part[idx + 1])
                 data[constants.KEY_PROJECT_TOTAL_BUDGET] = budget
                 idx += 2
-            # 标项
+            # 标项解析
             elif text.startswith("标项名称"):
                 bid_item = dict()
-                # 标项名称
                 idx += 1
+                # 标项名称
                 bid_item[constants.KEY_BID_ITEM_NAME] = part[idx]
-
                 idx += 1
                 while idx < n and not part[idx].startswith("标项名称"):
-                    print()
-                    # 数量
+                    # 标项采购数量
                     if check_bid_item_quantity(part[idx]):
                         quantity = part[idx + 1]
                         if quantity == "不限":
                             quantity = constants.BID_ITEM_QUANTITY_UNLIMITED
                         bid_item[constants.KEY_BID_ITEM_QUANTITY] = quantity
                         idx += 2
+                    # 标项预算金额
                     elif check_bid_item_budget(part[idx]):
                         bid_item[constants.KEY_BID_ITEM_BUDGET] = float(part[idx + 1])
                         idx += 2
                     else:
                         idx += 1
-                bid_items.append(bid_item)
+                bid_item[constants.KEY_BID_ITEM_INDEX] = bid_item_index
+                bid_item_index += 1
+                bid_items.append(complete_purchase_bid_item(bid_item))
             else:
                 idx += 1
         data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
@@ -74,36 +130,34 @@ class StandardFormatParser(AbstractFormatParser):
         :param part:
         :return:
         """
-        data = dict()
-        n, idx = len(part), 0
-
         def check_information_begin(s: str) -> bool:
             return common.startswith_number_index(s) >= 1
 
         def check_name(s: str) -> bool:
             startswith_name = s.startswith("名称") or (s.find("名") < s.find("称"))
-            endswith_colon = s.endswith(':') or s.endswith('：')
+            endswith_colon = s.endswith(":") or s.endswith("：")
             return startswith_name and endswith_colon
 
         def check_address(s: str) -> bool:
             startswith_address = s.startswith("地址") or (s.find("地") < s.find("址"))
-            endswith_colon = s.endswith(':') or s.endswith('：')
+            endswith_colon = s.endswith(":") or s.endswith("：")
             return startswith_address and endswith_colon
 
         def check_person(s: str) -> bool:
             startswith_person = s.startswith("项目联系人") or s.startswith("联系人")
-            endswith_colon = s.endswith(':') or s.endswith('：')
+            endswith_colon = s.endswith(":") or s.endswith("：")
             return startswith_person and endswith_colon
 
         def check_contact_method(s: str) -> bool:
-            startswith_contact_method = s.startswith("项目联系方式") or s.startswith("联系方式")
-            endswith_colon = s.endswith(':') or s.endswith('：')
+            startswith_contact_method = s.startswith("项目联系方式") or s.startswith(
+                "联系方式"
+            )
+            endswith_colon = s.endswith(":") or s.endswith("：")
             return startswith_contact_method and endswith_colon
 
+        data, n, idx = dict(), len(part), 0
         while idx < n:
-
             text = part[idx]
-            print(text)
             if check_information_begin(text):
                 # 采购人 / 采购代理机构信息
                 key_word = text[2:]
@@ -113,19 +167,19 @@ class StandardFormatParser(AbstractFormatParser):
                 while idx < n and not check_information_begin(part[idx]):
                     # 名称
                     if check_name(part[idx]):
-                        info['name'] = part[idx + 1]
+                        info["name"] = part[idx + 1]
                         idx += 2
                     # 地址
                     elif check_address(part[idx]):
-                        info['address'] = part[idx + 1]
+                        info["address"] = part[idx + 1]
                         idx += 2
                     # 联系人
                     elif check_person(part[idx]):
-                        info['person'] = part[idx + 1].split('、')
+                        info["person"] = part[idx + 1].split("、")
                         idx += 2
                     # 联系方式
                     elif check_contact_method(part[idx]):
-                        info['contact_method'] = part[idx + 1]
+                        info["contact_method"] = part[idx + 1]
                         idx += 2
                     else:
                         idx += 1
@@ -147,9 +201,9 @@ def parse_html(html_content: str):
     :return:
     """
     html = etree.HTML(html_content)
-    text_list = [text.strip() for text in html.xpath('//text()')]
+    # 找出所有的文本，并且进行过滤
+    text_list = [text.strip() for text in html.xpath("//text()")]
     result = common.filter_texts(text_list)
-    print('\n'.join(result))
 
     def check_useful_part(title: str) -> bool:
         """
@@ -157,11 +211,10 @@ def parse_html(html_content: str):
         :param title:
         :return:
         """
-        return ("项目基本情况" == title
-                or "以下方式联系" in title
-                )
+        return ("项目基本情况" == title) or ("以下方式联系" in title)
 
     n, idx, parts = len(result), 0, []
+
     # 将 result 划分为 若干个部分，每部分的第一个字符串是标题
     try:
         while idx < n:
@@ -176,47 +229,29 @@ def parse_html(html_content: str):
                 while idx < n and common.startswith_chinese_number(result[idx]) == -1:
                     idx += 1
                 # 将该部分加入
-                parts.append(result[pre: idx])
+                parts.append(result[pre:idx])
             else:
                 idx += 1
     except BaseException as e:
-        if isinstance(e, ParseError):
-            raise e
-        else:
-            raise ParseError(
-                msg='解析 parts 出现未完善情况',
-                content='\n'.join(result),
-                error=e
-            )
+        raise_error(error=e, msg="解析 parts 出现未完善情况", content=result)
 
     parts_length = len(parts)
     try:
-        if parts_length >= 7:
-            return __parse(parts, parser=StandardFormatParser)
+        if parts_length >= 2:
+            return _parse(parts, parser=StandardFormatParser)
         else:
-            raise ParseError(
-                msg='解析 parts 出现未完善情况',
-                content='\n'.join(result)
-            )
-
+            raise ParseError(msg="解析 parts 出现未完善情况", content=parts)
     except BaseException as e:
-        if isinstance(e, ParseError):
-            raise e
-        raise ParseError(
-            msg='解析 __parse_standard_format 失败',
-            content='\n'.join(result),
-            error=e
-        )
+        raise_error(error=e, msg="解析 __parse_standard_format 失败", content=parts)
 
 
-def __parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
+def _parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
     """
     解析 parts 部分
     :param parts:
     :param parser:
     :return:
     """
-    data = dict()
 
     # 通过标题来判断是哪个部分
     def is_project_base_situation(s):
@@ -225,17 +260,17 @@ def __parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
     def is_project_contact(s):
         return "以下方式联系" in s
 
+    data = dict()
     for part in parts:
         title = part[0]
         if is_project_base_situation(title):
             data.update(parser.parse_project_base_situation(part))
         elif is_project_contact(title):
             data.update(parser.parse_project_contact(part))
-
     return data
 
 
-if __name__ == '__main__':
-    with open('./test.html', 'r', encoding='utf-8') as f:
+if __name__ == "__main__":
+    with open("./test.html", "r", encoding="utf-8") as f:
         content = f.read()
     print(json.dumps(parse_html(content), indent=4, ensure_ascii=False))
