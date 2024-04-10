@@ -70,7 +70,7 @@ class AbstractFormatParser:
                     )
 
             # 最终报价/报价:[金额]（元/%）
-            if string.startswith("报价") or string.startswith("最终报价"):
+            if string.startswith("报价") or string.startswith("最终报价") or string.startswith("总报价"):
                 endswith_yuan_unit = string.endswith(
                     get_unit_with_bracket_symbol(string, "元")
                 )
