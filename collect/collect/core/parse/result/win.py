@@ -104,7 +104,6 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         def is_bid_item_index(s: str) -> bool:
             return s.isdigit()
 
-        print('\n'.join(part))
 
         try:
             idx, n, data = 0, len(part), []
@@ -120,7 +119,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                     # 中标供应商地址
                     pre = idx + 3
                     idx += 3
-                    while idx < n and not is_bid_item_index(price_text):
+                    while idx < n and not is_bid_item_index(part[idx]):
                         idx += 1
                     address_text = "".join(part[pre:idx])
                     bid_item[constants.KEY_BID_ITEM_INDEX] = int(text)
@@ -227,20 +226,23 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             data, idx, n = [], 1, len(part)
             while idx < n:
                 text = part[idx]
+                # 判断标题为 “1.中标结果”
                 if is_win_bid_result(text):
                     pre = idx + 1
                     while idx < n and not is_not_win_bid_result(part[idx]):
                         idx += 1
-                    data.append(
-                        *WinBidStandardFormatParser._parse_win_bids(part=part[pre:idx])
+                    data.extend(
+                        WinBidStandardFormatParser._parse_win_bids(
+                            part=part[pre:idx]
+                        )
                     )
-
+                # 判断标题为 “2.废标结果”
                 elif is_not_win_bid_result(text):
                     res = WinBidStandardFormatParser._parse_not_win_bids(
-                        part=part[idx + 1 :]
+                        part=part[idx + 1:]
                     )
                     if len(res) > 0:
-                        data.append(*res)
+                        data.extend(res)
                     idx += 1
                 else:
                     idx += 1
