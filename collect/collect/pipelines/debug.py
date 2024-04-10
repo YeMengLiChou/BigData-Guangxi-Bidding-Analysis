@@ -21,13 +21,15 @@ class DebugPipeline:
 
     def spider_opened(self):
         self.fp = open("logs/item_debug.json", "w", encoding="utf-8")
+        self.fp.write('[')
 
     def spider_closed(self):
         if self.fp:
+            self.fp.write(']')
             self.fp.close()
 
     def process_item(self, item, spider):
         self.fp.write(json.dumps(item, ensure_ascii=False, indent=4))
-        self.fp.write("\n")
+        self.fp.write(",\n")
         self.fp.flush()
         return item

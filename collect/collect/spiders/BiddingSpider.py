@@ -320,7 +320,6 @@ class BiddingSpider(scrapy.Spider):
             self.logger.error(f"result response not success: {response.text}")
             pass
 
-    # @timeout(10)
     def parse_result_detail_content(self, response: Response):
         """
         4. 解析 结果公告 的详情
@@ -332,8 +331,8 @@ class BiddingSpider(scrapy.Spider):
 
         response_body = json.loads(response.text)
         if response_body.get("success", False):
-            meta = response.meta
-            data = response_body["result"]["data"]
+            meta: dict = response.meta
+            data: dict = response_body["result"]["data"]
 
             meta[constants.KEY_PROJECT_CODE] = data["projectCode"]
             meta[constants.KEY_PROJECT_NAME] = data["projectName"]
@@ -344,7 +343,7 @@ class BiddingSpider(scrapy.Spider):
             try:
                 meta.update(
                     result.parse_html(
-                        html_content=data["content"], is_wid_bid=meta["is_win_bid"]
+                        html_content=data["content"], is_wid_bid=meta[constants.KEY_PROJECT_IS_WIN_BID]
                     )
                 )
             except SwitchError:

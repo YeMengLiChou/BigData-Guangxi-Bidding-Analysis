@@ -104,6 +104,8 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         def is_bid_item_index(s: str) -> bool:
             return s.isdigit()
 
+        print('\n'.join(part))
+
         try:
             idx, n, data = 0, len(part), []
             while idx < n:

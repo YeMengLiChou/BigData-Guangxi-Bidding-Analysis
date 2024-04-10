@@ -15,6 +15,9 @@ def parse_not_win_bid(parts: list[list[str]]):
     def is_preview(_title):
         return "评审" in _title
 
+    def is_termination_reason(_title):
+        return "终止" in _title
+
     data = dict()
     for part in parts:
         title = part[0]
@@ -22,6 +25,8 @@ def parse_not_win_bid(parts: list[list[str]]):
             data.update(NotWinBidStandardFormatParser.parse_review_expert(part))
         elif is_reason(title):
             data.update(NotWinBidStandardFormatParser.parse_cancel_reason(part))
+        elif is_termination_reason(title):
+            data.update(NotWinBidStandardFormatParser.parse_termination_reason(part))
         else:
             raise ParseError(f"{title} 不存在解析部分", content=part)
     return data
@@ -81,3 +86,11 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
             else:
                 raise ParseError(f"存在新的格式: {p}", content=part)
         return data
+
+    @staticmethod
+    def parse_termination_reason(part: list[str]) -> dict:
+        if len(part) > 2:
+            raise ParseError(f"终止理由存在额外内容:", content=part)
+        return {
+            constants.KEY_PROJECT_TERMINATION_REASON: part[-1]
+        }

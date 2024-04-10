@@ -117,6 +117,17 @@ KEY_PROJECT_REVIEW_EXPERT = "review_expert"
 项目-评审专家
 """
 
+KEY_PROJECT_IS_TERMINATION = "is_termination"
+"""
+项目-是否终止
+"""
+
+KEY_PROJECT_TERMINATION_REASON = "termination_reason"
+"""
+项目-终止原因
+"""
+
+
 KEY_PURCHASER_INFORMATION = "purchaser_information"
 """
 联系-采购人信息
