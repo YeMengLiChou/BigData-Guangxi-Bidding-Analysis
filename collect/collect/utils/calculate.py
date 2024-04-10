@@ -3,6 +3,7 @@ from decimal import Decimal, getcontext
 
 # ============ 金额解析/计算 ==============
 
+
 def decimal_subtract(a: str, b: str) -> str:
     """
     减法
@@ -48,9 +49,9 @@ def parse_string_with_unit(string: str) -> float:
             else:
                 integer = integer * 10 + int(i)
             has_dot = False
-        elif i == '.':
+        elif i == ".":
             if has_dot:
-                raise ValueError(f'{string} has double dots')
+                raise ValueError(f"{string} has double dots")
             has_dot = True
         else:
             break
@@ -63,7 +64,7 @@ def parse_unit(string: str) -> float:
     :param string:
     :return:
     """
-    if '%' in string:
+    if "%" in string:
         return 0
     if "亿" in string:
         return 1_0000_0000
@@ -72,5 +73,5 @@ def parse_unit(string: str) -> float:
     return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

@@ -41,7 +41,6 @@ def get_parentheses_position(s: str) -> tuple[int, int]:
         return -1, -1
 
 
-
 def endswith_colon_symbol(s: str) -> bool:
     """
     判断字符串是否以冒号结尾

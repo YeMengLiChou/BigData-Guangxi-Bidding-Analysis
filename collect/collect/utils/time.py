@@ -18,7 +18,7 @@ def from_timestamp(timestamp: int) -> datetime:
     return datetime.fromtimestamp(timestamp / 1000)
 
 
-def dateformat(timestamp: int, _format: str = '%Y-%m-%d-%a %H:%M:%S:%f') -> str:
+def dateformat(timestamp: int, _format: str = "%Y-%m-%d-%a %H:%M:%S:%f") -> str:
     """
     根据时间戳返回对应的时间字符串
     :param timestamp:
@@ -28,8 +28,6 @@ def dateformat(timestamp: int, _format: str = '%Y-%m-%d-%a %H:%M:%S:%f') -> str:
     return from_timestamp(timestamp).strftime(_format)
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     t = now_timestamp()
     print(dateformat(t))

@@ -79,9 +79,11 @@ def parse_response_data(data: list):
             # 是否中标
             constants.KEY_PROJECT_IS_WIN_BID: check_is_win_bid(item["pathName"]),
             # 是否为终止公告
-            constants.KEY_PROJECT_IS_TERMINATION: check_is_termination_announcement(item['pathName']),
+            constants.KEY_PROJECT_IS_TERMINATION: check_is_termination_announcement(
+                item["pathName"]
+            ),
             # 终止公告原因
-            constants.KEY_PROJECT_TERMINATION_REASON: None
+            constants.KEY_PROJECT_TERMINATION_REASON: None,
         }
         result.append(result_api_meta)
 
@@ -121,11 +123,11 @@ def parse_html(html_content: str, is_wid_bid: bool):
         """
         preview = ("评审专家" in title) or ("评审小组" in title)
         if is_wid_bid:
-            win_bidding = ("中标（成交）信息" == title)
+            win_bidding = "中标（成交）信息" == title
             return preview or win_bidding
         else:
-            reason = ("废标理由" in title)
-            shutdown = ("终止" in title)  # 终止原因
+            reason = "废标理由" in title
+            shutdown = "终止" in title  # 终止原因
             return preview or reason or shutdown
 
     n, idx, parts = len(result), 0, []
@@ -171,8 +173,7 @@ def parse_html(html_content: str, is_wid_bid: bool):
 
 
 if __name__ == "__main__":
-    content = \
-        "test"
+    content = "test"
 
     res = parse_html(content, True)
     print(res)

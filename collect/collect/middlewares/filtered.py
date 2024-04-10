@@ -45,9 +45,11 @@ class ArticleIdFilterDownloadMiddleware:
             url = request.url
             article_id = _parse_article_id(url)
             if article_id and redis.check_article_id_exist(article_id):
-                raise IgnoreRequest(f"article_id: {article_id} is duplicated, filter it!")
+                raise IgnoreRequest(
+                    f"article_id: {article_id} is duplicated, filter it!"
+                )
         return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pass

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import config.config
+
     _DEBUG = getattr(config.config.settings, "debug.enable", False)
 except ImportError:
     logger.warning("未找到配置文件, 默认开启 DEBUG 模式")
@@ -166,9 +167,7 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
         ]
 
     if _DEBUG:
-        logger.debug(
-            f"DEBUG INFO: {log.get_function_name()} finished\n"
-        )
+        logger.debug(f"DEBUG INFO: {log.get_function_name()} finished\n")
     return _result
 
 
@@ -180,9 +179,7 @@ def make_item(data: dict, purchase_data: dict):
     :return:
     """
     if _DEBUG:
-        logger.debug(
-            f"DEBUG INFO: {log.get_function_name()} started\n"
-        )
+        logger.debug(f"DEBUG INFO: {log.get_function_name()} started\n")
 
     # 合并标项
     purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
@@ -252,9 +249,7 @@ def make_item(data: dict, purchase_data: dict):
         constants.KEY_PROJECT_REVIEW_EXPERT, []
     )
     if _DEBUG:
-        logger.debug(
-            f"DEBUG INFO: {log.get_function_name()} finished\n"
-        )
+        logger.debug(f"DEBUG INFO: {log.get_function_name()} finished\n")
 
     return item
 
@@ -343,7 +338,8 @@ class BiddingSpider(scrapy.Spider):
             try:
                 meta.update(
                     result.parse_html(
-                        html_content=data["content"], is_wid_bid=meta[constants.KEY_PROJECT_IS_WIN_BID]
+                        html_content=data["content"],
+                        is_wid_bid=meta[constants.KEY_PROJECT_IS_WIN_BID],
                     )
                 )
             except SwitchError:

@@ -27,6 +27,7 @@ def timeout(seconds: int, record_running_time=True):
                 logger.info(f"func {func.__name__} start recording....")
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
+
                 def translate():
                     res = func(*args, **kwargs)
                     if isinstance(res, types.GeneratorType):
@@ -40,10 +41,14 @@ def timeout(seconds: int, record_running_time=True):
                     result = future.result(timeout=seconds)  # 设置超时时间为 5 秒
                 except concurrent.futures.TimeoutError:
                     future.cancel()
-                    raise FunctionTimeout(f"Function {func.__name__} timed out, total: {time.time() - start_time}s")
+                    raise FunctionTimeout(
+                        f"Function {func.__name__} timed out, total: {time.time() - start_time}s"
+                    )
                 else:
                     if record_running_time:
-                        logger.info(f"func {func.__name__} cost {time.time() - start_time}s <= {seconds}s!")
+                        logger.info(
+                            f"func {func.__name__} cost {time.time() - start_time}s <= {seconds}s!"
+                        )
                     return result
 
         return wrapper

@@ -1,5 +1,3 @@
-
-
 BOT_NAME = "collect"
 
 SPIDER_MODULES = ["collect.spiders"]
@@ -50,7 +48,7 @@ DOWNLOADER_MIDDLEWARES = {
     "collect.middlewares.AnnouncementFilterMiddleware": 12,
     "collect.middlewares.UserAgentMiddleware": 100,
     "collect.middlewares.ResponseDebugMiddleware": 100,
-    'scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware': 500,
+    "scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware": 500,
 }
 
 # Enable or disable extensions

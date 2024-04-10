@@ -9,9 +9,7 @@ class DetailApi(GETBaseApi):
 
     @staticmethod
     def get_complete_url(
-            articleId: str,
-            parentId: int = 66485,
-            timestamp: int = time.now_timestamp()
+        articleId: str, parentId: int = 66485, timestamp: int = time.now_timestamp()
     ) -> str:
         """
         生成完整的请求 url
@@ -20,7 +18,9 @@ class DetailApi(GETBaseApi):
         :param timestamp:
         :return:
         """
-        return (f"{DetailApi.base_url}"
-                f"?articleId={quote(articleId)}"
-                f"&parentId={parentId}"
-                f"&timestamp={timestamp}")
+        return (
+            f"{DetailApi.base_url}"
+            f"?articleId={quote(articleId)}"
+            f"&parentId={parentId}"
+            f"&timestamp={timestamp}"
+        )

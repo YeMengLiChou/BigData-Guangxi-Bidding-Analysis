@@ -51,7 +51,7 @@ def parse_timestamp(timestamp: int) -> str:
 
 
 def get_latest_announcement_timestamp(
-        parse_to_str: bool = True,
+    parse_to_str: bool = True,
 ) -> Union[int, str, None]:
     """
     获取数据库中最新的公告时间戳
@@ -94,6 +94,7 @@ def clear_latest_announcement_timestamp():
 
 # --------------------- ARTICLE IDS --------------------- #
 
+
 def add_unique_article_id(article_id: str) -> bool:
     """
     添加一个唯一的公告结果 ID
@@ -129,5 +130,5 @@ def count_article_ids() -> int:
     return _client.scard(KEY_ANNOUNCEMENT_ARTICLE_IDS)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(_client.smembers(KEY_ANNOUNCEMENT_ARTICLE_IDS))

@@ -104,7 +104,6 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         def is_bid_item_index(s: str) -> bool:
             return s.isdigit()
 
-
         try:
             idx, n, data = 0, len(part), []
             while idx < n:
@@ -232,14 +231,12 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                     while idx < n and not is_not_win_bid_result(part[idx]):
                         idx += 1
                     data.extend(
-                        WinBidStandardFormatParser._parse_win_bids(
-                            part=part[pre:idx]
-                        )
+                        WinBidStandardFormatParser._parse_win_bids(part=part[pre:idx])
                     )
                 # 判断标题为 “2.废标结果”
                 elif is_not_win_bid_result(text):
                     res = WinBidStandardFormatParser._parse_not_win_bids(
-                        part=part[idx + 1:]
+                        part=part[idx + 1 :]
                     )
                     if len(res) > 0:
                         data.extend(res)
@@ -280,7 +277,8 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                             representor = persons[:l]
                         else:
                             raise ParseError(
-                                msg="评审专家解析部分-采购人部分出现特殊情况", content=part
+                                msg="评审专家解析部分-采购人部分出现特殊情况",
+                                content=part,
                             )
                     else:
                         raise ParseError(

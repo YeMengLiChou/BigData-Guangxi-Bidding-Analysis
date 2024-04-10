@@ -10,11 +10,11 @@ class CategoryApi(POSTBaseApi):
 
     @staticmethod
     def generate_body(
-            pageNo: int,
-            pageSize: int,
-            categoryCode: str,
-            publishDateBegin: str,
-            publishDateEnd: str
+        pageNo: int,
+        pageSize: int,
+        categoryCode: str,
+        publishDateBegin: str,
+        publishDateEnd: str,
     ) -> str:
         """
         返回请求体的json
@@ -25,11 +25,13 @@ class CategoryApi(POSTBaseApi):
         :param publishDateEnd:
         :return:
         """
-        return json.dumps({
-            "pageNo": pageNo,
-            "pageSize": pageSize,
-            "categoryCode": categoryCode,
-            "publishDateBegin": publishDateBegin,
-            "publishDateEnd": publishDateEnd,
-            "_t": int(datetime.now().timestamp())
-        })
+        return json.dumps(
+            {
+                "pageNo": pageNo,
+                "pageSize": pageSize,
+                "categoryCode": categoryCode,
+                "publishDateBegin": publishDateBegin,
+                "publishDateEnd": publishDateEnd,
+                "_t": int(datetime.now().timestamp()),
+            }
+        )

@@ -319,7 +319,6 @@ def _parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
 
 
 if __name__ == "__main__":
-    content = \
-        ""
+    content = ""
 
     print(json.dumps(parse_html(content), indent=4, ensure_ascii=False))

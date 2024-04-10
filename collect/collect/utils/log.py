@@ -11,8 +11,8 @@ def _pretty_json(data: Union[dict, scrapy.Item]) -> str:
 
 
 def json(
-        logger: callable,
-        data: Any,
+    logger: callable,
+    data: Any,
 ):
     """
     输出 json 格式数据
@@ -29,10 +29,10 @@ def get_function_name():
     :return:
     """
     from inspect import currentframe, getframeinfo
+
     frame_info = getframeinfo(currentframe().f_back)
     function_name = frame_info.function
     return function_name
 
 
 # def debug(start_msg: str = None, end_msg: str = None):
-

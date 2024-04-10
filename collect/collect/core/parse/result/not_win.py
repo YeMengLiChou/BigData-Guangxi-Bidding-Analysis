@@ -3,9 +3,7 @@ import re
 
 from collect.collect.core.parse import AbstractFormatParser
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import (
-    symbol_tools as sym
-)
+from collect.collect.utils import symbol_tools as sym
 from contant import constants
 
 logger = logging.getLogger(__name__)
@@ -51,7 +49,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                 if l != -1 and r != -1:
                     if l == 0:
                         # 名字在括号的右边
-                        representor = persons[r + 1:]
+                        representor = persons[r + 1 :]
                     elif r == len(persons) - 1:
                         # 名字在括号的左边
                         representor = persons[:l]
@@ -66,7 +64,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                 data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representor
                 review_experts.append(representor)
             else:
-                if person == '/':
+                if person == "/":
                     continue
                 review_experts.append(persons)
         data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
@@ -84,15 +82,17 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
             match = re.match(".*(分标|标项)([0-9]):(.*)", p)
             if match:
                 index, reason = match.group(1), match.group(2)
-                bid_items.append({
-                    constants.KEY_BID_ITEM_INDEX: index,
-                    constants.KEY_BID_ITEM_IS_WIN: False,
-                    constants.KEY_BID_ITEM_REASON: reason,
-                    constants.KEY_BID_ITEM_IS_PERCENT: False,
-                    constants.KEY_BID_ITEM_SUPPLIER_ADDRESS: None,
-                    constants.KEY_BID_ITEM_SUPPLIER: None,
-                    constants.KEY_BID_ITEM_AMOUNT: constants.BID_ITEM_AMOUNT_NOT_DEAL
-                })
+                bid_items.append(
+                    {
+                        constants.KEY_BID_ITEM_INDEX: index,
+                        constants.KEY_BID_ITEM_IS_WIN: False,
+                        constants.KEY_BID_ITEM_REASON: reason,
+                        constants.KEY_BID_ITEM_IS_PERCENT: False,
+                        constants.KEY_BID_ITEM_SUPPLIER_ADDRESS: None,
+                        constants.KEY_BID_ITEM_SUPPLIER: None,
+                        constants.KEY_BID_ITEM_AMOUNT: constants.BID_ITEM_AMOUNT_NOT_DEAL,
+                    }
+                )
             else:
                 raise ParseError(f"存在新的格式: {p}", content=part)
         return data
@@ -101,6 +101,4 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
     def parse_termination_reason(part: list[str]) -> dict:
         if len(part) > 2:
             raise ParseError(f"终止理由存在额外内容:", content=part)
-        return {
-            constants.KEY_PROJECT_TERMINATION_REASON: part[-1]
-        }
+        return {constants.KEY_PROJECT_TERMINATION_REASON: part[-1]}

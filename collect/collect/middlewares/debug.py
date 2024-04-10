@@ -99,7 +99,7 @@ class ResponseDebugMiddleware(object):
         return response
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     log_dir = ".\\..\\..\\..\\logs"
     dirs = os.listdir(log_dir)
     cnt = 0

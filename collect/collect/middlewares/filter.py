@@ -9,6 +9,7 @@ class AnnouncementFilterMiddleware:
     过滤已经爬取过的公告
     根据存储在redis中的articleId进行判断
     """
+
     logger = logging.getLogger("collect.middleware.AnnouncementFilterMiddleware")
 
     @classmethod

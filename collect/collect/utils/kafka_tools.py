@@ -3,12 +3,7 @@ import logging
 import threading
 import atexit
 from typing import Union
-from kafka import (
-    KafkaProducer,
-    KafkaAdminClient,
-    errors,
-    admin
-)
+from kafka import KafkaProducer, KafkaAdminClient, errors, admin
 from config.config import settings
 
 from collect.collect.utils import time
@@ -33,26 +28,28 @@ def _init_config():
     :return:
     """
     if DEBUG:
-        _config['hostname'] = '172.27.237.77'
-        _config['port'] = 9092
-        _config['topic'] = 'test1'
-        _config['key'] = None
+        _config["hostname"] = "172.27.237.77"
+        _config["port"] = 9092
+        _config["topic"] = "test1"
+        _config["key"] = None
     else:
-        _config['hostname'] = getattr(settings, "kafka.hostname", None)
-        _config['port'] = getattr(settings, "kafka.port", None)
-        _config['topic'] = getattr(settings, "kafka.scrapy.topic", None)
-        _config['key'] = getattr(settings, "kafka.scrapy.key", None)
+        _config["hostname"] = getattr(settings, "kafka.hostname", None)
+        _config["port"] = getattr(settings, "kafka.port", None)
+        _config["topic"] = getattr(settings, "kafka.scrapy.topic", None)
+        _config["key"] = getattr(settings, "kafka.scrapy.key", None)
 
-    if _config.get('hostname', None) is None:
+    if _config.get("hostname", None) is None:
         raise ValueError("kafka.hostname is not set in settings.toml")
 
-    if _config.get('port', None) is None:
+    if _config.get("port", None) is None:
         raise ValueError("kafka.port is not set in settings.toml")
 
-    if _config.get('topic', None) is None:
+    if _config.get("topic", None) is None:
         raise ValueError("kafka.scrapy.topic is not set in settings.toml")
 
-    logger.info(f"bootstrap-server={_config['hostname']}:{_config['port']}, topic={_config['topic']}")
+    logger.info(
+        f"bootstrap-server={_config['hostname']}:{_config['port']}, topic={_config['topic']}"
+    )
 
 
 def _init_producer():
@@ -105,7 +102,8 @@ if _producer is None:
             # 没有链接到服务器
             if not _producer.bootstrap_connected():
                 raise ConnectionError(
-                    "kafka bootstrap server is not connected! please make sure your hostname and post!")
+                    "kafka bootstrap server is not connected! please make sure your hostname and post!"
+                )
 
 
 def create_topic(topic: str):
@@ -119,11 +117,15 @@ def create_topic(topic: str):
     if not topic or not isinstance(topic, str):
         raise TypeError(f"topic must be str type!")
     try:
-        response = _admin.create_topics([admin.NewTopic(
-            topic,
-            num_partitions=1,
-            replication_factor=1,
-        )])
+        response = _admin.create_topics(
+            [
+                admin.NewTopic(
+                    topic,
+                    num_partitions=1,
+                    replication_factor=1,
+                )
+            ]
+        )
     except errors.TopicAlreadyExistsError:
         return True
     return response.topic_errors[0][1] == 0  # verify error code
@@ -142,10 +144,15 @@ def send_item_to_kafka(item: Union[dict, str]):
     else:
         raise TypeError("item must be dict or str")
     # response 为 future 类型，需要 get 后才能知道是否成功响应
-    response = _producer.send(_config['topic'], value=value, key=_config['key'], timestamp_ms=time.now_timestamp())
+    response = _producer.send(
+        _config["topic"],
+        value=value,
+        key=_config["key"],
+        timestamp_ms=time.now_timestamp(),
+    )
     response.get()
     return response.succeeded()
 
 
-if __name__ == '__main__':
-    send_item_to_kafka('hahahahhaha')
+if __name__ == "__main__":
+    send_item_to_kafka("hahahahhaha")

@@ -65,15 +65,13 @@ def parse_html(html_content: str) -> list[str]:
     return filter_texts(text_list)
 
 
-
-
 def startswith_chinese_number(text: str) -> int:
     """
     判断text是否为 “中文数字、” 开头，最多匹配到 20
     :param text:
     :return:
     """
-    idx = text.find('、')
+    idx = text.find("、")
     if idx == -1:
         return -1
     return chinese_number_mapper.get(text[:idx], -1)

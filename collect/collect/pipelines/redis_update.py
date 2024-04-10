@@ -69,10 +69,6 @@ class UpdateRedisInfoPipeline:
             redis.add_unique_article_id(result_id)
 
         # 结果公告的发布日期作为标准
-        result_publish_date = item.get(
-            constants.KEY_PROJECT_RESULT_PUBLISH_DATE
-        )
+        result_publish_date = item.get(constants.KEY_PROJECT_RESULT_PUBLISH_DATE)
         if result_publish_date:
-            redis.set_latest_announcement_timestamp(
-                timestamp=result_publish_date
-            )
+            redis.set_latest_announcement_timestamp(timestamp=result_publish_date)

@@ -20,14 +20,14 @@ class ParseError(Exception):
     """自定义解析错误"""
 
     def __init__(
-            self,
-            msg: str,
-            content: Union[list[str], None] = None,
-            url: Union[str, None] = None,
-            error: Union[BaseException, None] = None,
-            timestamp: int = time.now_timestamp(),
-            response_status: int = -1,
-            response_body: Union[str, None] = None,
+        self,
+        msg: str,
+        content: Union[list[str], None] = None,
+        url: Union[str, None] = None,
+        error: Union[BaseException, None] = None,
+        timestamp: int = time.now_timestamp(),
+        response_status: int = -1,
+        response_body: Union[str, None] = None,
     ):
         """
         :param msg: 出错原因
@@ -69,7 +69,7 @@ class ParseError(Exception):
             "error": self.error.__repr__(),
             "response": {"status": self.response_status, "data": self.response_body},
             "content": self.content,
-            "exc_info": self.exc_info
+            "exc_info": self.exc_info,
         }
 
 
@@ -88,7 +88,9 @@ def ensure_file_exist(file: str):
         path.touch(exist_ok=True)
 
 
-def complete_error(error: ParseError, response: Response, contains_response_body: bool = True):
+def complete_error(
+    error: ParseError, response: Response, contains_response_body: bool = True
+):
     """
     补充部分信息
     :param contains_response_body: 是否赋值 body
@@ -97,7 +99,7 @@ def complete_error(error: ParseError, response: Response, contains_response_body
     :return:
     """
     error.response_status = response.status
-    error.response_body = response.text if contains_response_body else ''
+    error.response_body = response.text if contains_response_body else ""
     error.url = response.url
     if len(error.exc_info) == 0:
         error.exc_info = traceback.format_tb(error.__traceback__)
@@ -117,7 +119,9 @@ class ParseErrorHandlerMiddleware:
         self.articleIds: Union[set[str], None] = None
 
         settings = crawler.settings
-        self.contains_response_body = settings.get("PARSE_ERROR_CONTAINS_RESPONSE_BODY", True)
+        self.contains_response_body = settings.get(
+            "PARSE_ERROR_CONTAINS_RESPONSE_BODY", True
+        )
         self.log_format = settings.get("LOG_FORMAT")
         self.log_dateformat = settings.get("LOG_DATEFORMAT")
         self.log_dir = settings.get("PARSE_ERROR_LOG_DIR", "logs")
@@ -225,7 +229,7 @@ class ParseErrorHandlerMiddleware:
         return None if (article_id in self.articleIds) else article_id
 
     def process_spider_exception(
-            self, response: Response, exception: BaseException, spider: Spider
+        self, response: Response, exception: BaseException, spider: Spider
     ):
         # 处理 ParseError
         if isinstance(exception, ParseError):

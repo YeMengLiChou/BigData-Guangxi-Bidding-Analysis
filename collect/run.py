@@ -17,19 +17,16 @@ def _get_project_settings(module_path: str) -> Settings:
 
     # 将 settings.py 中的路径字符串拼接为新的路径
     split_path = module_path.split(".")
-    new_prefix = '.'.join(split_path[:-2])
-    old_prefix = '.'.join(split_path[-2:-1]) + '.'
+    new_prefix = ".".join(split_path[:-2])
+    old_prefix = ".".join(split_path[-2:-1]) + "."
 
     def modify(value):
         if isinstance(value, str) and value.startswith(old_prefix):
-            return '.'.join([new_prefix, value])
+            return ".".join([new_prefix, value])
         elif isinstance(value, list):
             return [modify(item) for item in value]
         elif isinstance(value, dict):
-            return {
-                modify(k): v
-                for k, v in value.items()
-            }
+            return {modify(k): v for k, v in value.items()}
         else:
             return value
 
@@ -39,9 +36,7 @@ def _get_project_settings(module_path: str) -> Settings:
     for key in dir(settings_module):
         if key.isupper():
             settings.set(
-                key,
-                value=modify(getattr(settings_module, key)),
-                priority="project"
+                key, value=modify(getattr(settings_module, key)), priority="project"
             )
 
     return settings
@@ -70,9 +65,7 @@ def configure_logging(settings: Settings):
         encoding = settings.get("LOG_ENCODING")  # 日志文件编码
 
         handler = logging.FileHandler(
-            filename=filename,
-            mode=file_mode,
-            encoding=encoding
+            filename=filename, mode=file_mode, encoding=encoding
         )
 
         formatter = logging.Formatter(  # 设置日志格式
@@ -91,21 +84,21 @@ def configure_logging(settings: Settings):
             fmt=log_format,
             milliseconds=True,
             level_styles={
-                'critical': {'color': 9},
-                'error': {'color': 1},
-                'warn': {'color': 11},
-                'info': {'color': 250},
-                'debug': {'color': 117},
+                "critical": {"color": 9},
+                "error": {"color": 1},
+                "warn": {"color": 11},
+                "info": {"color": 250},
+                "debug": {"color": 117},
             },
             field_styles={
-                'asctime': {'color': 227},
-                'name': {'color': 219},
-                'levelname': {
-                    'color': 147,
-                    'bold': True,
-                    'bright': True,
-                    'italic': True,
-                    'underline': True
+                "asctime": {"color": 227},
+                "name": {"color": 219},
+                "levelname": {
+                    "color": 147,
+                    "bold": True,
+                    "bright": True,
+                    "italic": True,
+                    "underline": True,
                 },
             },
             isatty=True,
@@ -123,16 +116,16 @@ def _run_spider(spider_name: str, _settings: Settings):
     crawler_process = CrawlerProcess(_settings, install_root_handler=False)
     crawl_defer = crawler_process.crawl(spider_name)
     if getattr(crawl_defer, "result", None) is not None and issubclass(
-            crawl_defer.result.type, Exception
+        crawl_defer.result.type, Exception
     ):
         exitcode = 1
     else:
         crawler_process.start()
 
         if (
-                crawler_process.bootstrap_failed
-                or hasattr(crawler_process, "has_exception")
-                and crawler_process.has_exception
+            crawler_process.bootstrap_failed
+            or hasattr(crawler_process, "has_exception")
+            and crawler_process.has_exception
         ):
             exitcode = 1
         else:

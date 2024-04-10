@@ -35,7 +35,7 @@ class UserAgentMiddleware(object):
         "Safari/537.36 OPR/108.0.0.0",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 "
-        "Safari/537.36 Edg/121.0.2277.128"
+        "Safari/537.36 Edg/121.0.2277.128",
     ]
 
     @classmethod
@@ -47,5 +47,5 @@ class UserAgentMiddleware(object):
 
     def process_request(self, request: Request, spider):
         if not request.headers.get("User-Agent", None):
-            request.headers['User-Agent'] = random.choice(self.user_agents)
+            request.headers["User-Agent"] = random.choice(self.user_agents)
         return None
