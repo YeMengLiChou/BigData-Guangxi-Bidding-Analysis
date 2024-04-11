@@ -23,7 +23,7 @@ __all__ = [
 class StatsCollector:
 
     def __init__(self):
-        self.func_running_time = dict[str, tuple[float, int]]()
+        self.func_running_time = dict[str, list]()
 
     def inc_function(self, func_name: str, running_time: float):
         """
@@ -33,7 +33,7 @@ class StatsCollector:
         :return:
         """
         if func_name not in self.func_running_time:
-            value = (running_time, 1)
+            value = [running_time, 1]
             self.func_running_time[func_name] = value
         else:
             value = self.func_running_time[func_name]
@@ -94,15 +94,14 @@ def function_stats(_logger: logging.Logger = logger, log_params: bool = False):
     :param log_params:
     :return:
     """
-
     def decorator(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            start_time = 0
-            try:
+        start_time = 0
+        try:
+            def start_stats(*args, **kwargs):
                 if DEBUG_STATUS:
                     # 记录 函数开始时间
-                    log_info = f"DEBUG INFO: {func.__name__} started."
+                    log_info = f"DEBUG INFO: {func.__qualname__} started."
+                    nonlocal start_time
                     start_time = time.time()
                     if log_params:
                         if len(args) != 0:
@@ -114,23 +113,30 @@ def function_stats(_logger: logging.Logger = logger, log_params: bool = False):
                             log_info += f"\nkwargs:\n\t{kwargs_str}"
                     _logger.debug(log_info)
 
-                # 运行被修饰函数
-                if inspect.isgeneratorfunction(func):
+            # 生成器函数
+            if inspect.isgeneratorfunction(func):
+                @functools.wraps(func)
+                def wrapper(*args, **kwargs):
+                    start_stats(*args, **kwargs)
+                    # 运行被修饰函数
                     for item in func(*args, **kwargs):
                         yield item
-                else:
-                    return func(*args, **kwargs)
-            finally:
-                if DEBUG_STATUS:
-                    running_time = time.time() - start_time
-                    _logger.debug(
-                        f"DEBUG INFO: {func.__name__} running {running_time} s."
-                    )
-                    # 统计函数运行时间
-                    stat_collector.inc_function(
-                        func_name=func.__qualname__, running_time=running_time
-                    )
 
+            else:
+                @functools.wraps(func)
+                def wrapper(*args, **kwargs):
+                    start_stats(*args, **kwargs)
+                    return func(*args, **kwargs)
+        finally:
+            if DEBUG_STATUS:
+                running_time = time.time() - start_time
+                _logger.debug(
+                    f"DEBUG INFO: {func.__qualname__} running {running_time} s."
+                )
+                # 统计函数运行时间
+                stat_collector.inc_function(
+                    func_name=func.__qualname__, running_time=running_time
+                )
         return wrapper
 
     return decorator

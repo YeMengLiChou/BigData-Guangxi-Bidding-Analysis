@@ -1,8 +1,13 @@
 import json
 import logging
-from typing import Union
+import urllib.parse
+from typing import Union, Any
+
+from scrapy import signals
+from typing_extensions import Self
 
 import scrapy
+from scrapy.crawler import Crawler
 from scrapy.http import Response
 
 from collect.collect.core.api.category import CategoryApi
@@ -23,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @stats.function_stats(logger, log_params=True)
 def _make_result_request(
-    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
+        pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
 ):
     """
     生成结果列表的请求
@@ -223,14 +228,44 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
 class BiddingSpider(scrapy.Spider):
     name = "bidding"
 
+    @classmethod
+    def from_crawler(cls, crawler: Crawler, *args: Any, **kwargs: Any) -> Self:
+        obj = cls()
+        crawler.signals.connect(obj.spider_closed, signal=signals.spider_closed)
+        return obj
+
+    def spider_closed(self):
+        stats.log_stats_collector()
+
+    # ========== use for debug ================
+    special_article_ids = [
+        # template: ("article_id", is_win: bool)
+        ("/VzMNpuL7TfpTeW1j2JlvQ%3D%3D", True)
+    ]
+
+    #  =========================================
+
     def start_requests(self):
         """
         1. 先请求些数据，通过返回的数据中的 total 字段来控制请求数量
         :return:
         """
-        yield _make_result_request(
-            pageNo=1, pageSize=1, callback=self.parse_result_amount, dont_filter=True
-        )
+        if len(self.special_article_ids) > 0:
+            # 调试有问题的 article_id
+            logger.warning(f"Start Special Requests, total {len(self.special_article_ids)}")
+            for article_id, is_win in self.special_article_ids:
+                logger.warning(f"Special Article: {article_id}")
+                yield _make_detail_request(
+                    articleId=urllib.parse.unquote(article_id),
+                    callback=self.parse_result_detail_content,
+                    meta={
+                        constants.KEY_PROJECT_IS_WIN_BID: is_win
+                    },
+                )
+        else:
+            yield _make_result_request(
+                pageNo=1, pageSize=1, callback=self.parse_result_amount, dont_filter=True
+            )
 
     @stats.function_stats(logger)
     def parse_result_amount(self, response: Response):
@@ -345,8 +380,8 @@ class BiddingSpider(scrapy.Spider):
                 item
                 for item in other_announcements
                 if (item["typeName"] == "结果公告")
-                and (not item["isCurrent"])
-                and item["isExist"]
+                   and (not item["isCurrent"])
+                   and item["isExist"]
             ],
             key=lambda item: item["order"],
             reverse=True,
@@ -384,3 +419,7 @@ class BiddingSpider(scrapy.Spider):
         else:
             # TODO: 加入 retry 功能
             self.logger.error(f"purchase response not success: {response.text}")
+
+
+if __name__ == '__main__':
+    print("请启动 main-collecting.py 文件，而不是本文件！")
