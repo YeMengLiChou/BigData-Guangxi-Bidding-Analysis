@@ -75,13 +75,13 @@ class ResponseDebugMiddleware(object):
         :return:
         """
         if self.pre_clear_log:
-            dirs = os.listdir(self.log_dir)
-            cnt = 0
-            for d in dirs:
-                if re.match(r"debug-[0-9]*\.log", d):
-                    os.remove(os.path.join(self.log_dir, d))
-                    cnt += 1
-            logger.info(f"Cleared existed {cnt} log files.")
+            log_dirs = os.listdir(self.log_dir)
+            cleared_cnt = 0
+            for _d in log_dirs:
+                if re.match(r"debug-[0-9]*\.log", _d):
+                    os.remove(os.path.join(self.log_dir, _d))
+                    cleared_cnt += 1
+            logger.info(f"Cleared existed {cleared_cnt} log files.")
 
     def process_response(self, request: Request, response: Response, spider: Spider):
         if self.debug:

@@ -66,9 +66,11 @@ def parse_win_bid(parts: list[list[str]]) -> dict | None:
 
     for part in parts:
         if is_bids_information(title=part[0]):
+            # 解析 标项信息
             bid_items = parse_bids_information(
                 _part=part, parser=WinBidStandardFormatParser
             )
+            # 如果没有标项，需要切换到其他结果公告解析
             if len(bid_items) == 0:
                 logger.warning(
                     "该结果公告没有爬取到任何标项信息！尝试切换 other_announcements 进行查找！"
@@ -258,39 +260,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             logger.debug(f"{log.get_function_name()} started")
 
         try:
-            data = dict()
-            dist = part[-1]
-            # 获取分隔符
-            split_symbol = sym.get_symbol(dist, [",", "，", "、"])
-            persons = dist.split(split_symbol)
-            review_experts = []
-            for person in persons:
-                # 采购人代表
-                if "采购人代表" in persons:
-                    l, r = sym.get_parentheses_position(person)
-                    if l != -1 and r != -1:
-                        if l == 0:
-                            # 名字在括号的右边
-                            representor = persons[r + 1 :]
-                        elif r == len(persons) - 1:
-                            # 名字在括号的左边
-                            representor = persons[:l]
-                        else:
-                            raise ParseError(
-                                msg="评审专家解析部分-采购人部分出现特殊情况",
-                                content=part,
-                            )
-                    else:
-                        raise ParseError(
-                            msg="评审专家解析部分-采购人部分出现特殊情况", content=part
-                        )
-
-                    data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representor
-                    review_experts.append(representor)
-                # 非采购人代表
-                else:
-                    review_experts.append(persons)
-            return data
+            return common.parse_review_experts(part)
         finally:
             if _DEBUG:
                 logger.debug(

@@ -9,10 +9,7 @@ from scrapy.http import Response
 
 from collect.collect.core.api.category import CategoryApi
 from collect.collect.core.api.detail import DetailApi
-from collect.collect.core.parse import (
-    result,
-    purchase
-)
+from collect.collect.core.parse import result, purchase
 from collect.collect.core.parse.result import SwitchError
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import redis_tools as redis
@@ -36,7 +33,7 @@ if _DEBUG:
 
 
 def _make_result_request(
-        pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
+    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
 ):
     """
     生成结果列表的请求
@@ -114,11 +111,15 @@ def _parse_other_announcements(other_announcements):
             return None
 
         # 过滤出存在且非当前结果公告的公告信息
-        exist_other_announcements = [
-            item
-            for item in other_announcements
-            if item.get("isExist", False) and not item.get("isCurrent", False)
-        ]
+        exist_other_announcements = sorted(
+            [
+                item
+                for item in other_announcements
+                if item.get("isExist", False) and (not item.get("isCurrent", False))
+            ],
+            key=lambda item: item["order"],
+            reverse=True,
+        )
         # 找出 采购公告
         for item in exist_other_announcements:
             if item["typeName"] == "采购公告":
@@ -136,7 +137,9 @@ def _parse_other_announcements(other_announcements):
         return None
     finally:
         if _DEBUG:
-            logger.debug(f"DEBUG INFO: {log.get_function_name()} finished. running: {time.time() - start_time}")
+            logger.debug(
+                f"DEBUG INFO: {log.get_function_name()} finished. running: {time.time() - start_time}"
+            )
 
 
 def _merge_bid_items(_purchase: list, _result: list) -> list:
@@ -262,7 +265,9 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
         constants.KEY_PROJECT_REVIEW_EXPERT, []
     )
     if _DEBUG:
-        logger.debug(f"DEBUG INFO: {log.get_function_name()} finished. running: {time.time() - start_time}")
+        logger.debug(
+            f"DEBUG INFO: {log.get_function_name()} finished. running: {time.time() - start_time}"
+        )
 
     return item
 
@@ -375,16 +380,21 @@ class BiddingSpider(scrapy.Spider):
             # 存在 “采购公告”
             if purchase_article_id:
                 if _DEBUG:
-                    logger.debug(f"DEBUG INFO: {log.get_function_name()} yield. running: {time.time() - start_time}")
+                    logger.debug(
+                        f"DEBUG INFO: {log.get_function_name()} yield. running: {time.time() - start_time}"
+                    )
 
                 yield _make_detail_request(
-                    articleId=purchase_article_id, callback=self.parse_purchase, meta=meta
+                    articleId=purchase_article_id,
+                    callback=self.parse_purchase,
+                    meta=meta,
                 )
             else:
                 # 没有 “采购公告”，直接进入 make_item 生成 item
                 if _DEBUG:
                     logger.debug(
-                        f"DEBUG INFO: {log.get_function_name()} finished (no purchase). running: {time.time() - start_time} ")
+                        f"DEBUG INFO: {log.get_function_name()} finished (no purchase). running: {time.time() - start_time} "
+                    )
 
                 yield make_item(data=meta, purchase_data=None)
 
@@ -399,15 +409,23 @@ class BiddingSpider(scrapy.Spider):
         :param other_announcements:
         :return:
         """
-        other_result = [
-            item
-            for item in other_announcements
-            if item["typeName"] == "结果公告"
-               and not item["isCurrent"]
-               and item["isExist"]
-        ]
+        # 对 order 进行排序，取order最大的
+        other_result = sorted(
+            # 过滤出所有结果公告
+            [
+                item
+                for item in other_announcements
+                if (item["typeName"] == "结果公告")
+                and (not item["isCurrent"])
+                and item["isExist"]
+            ],
+            key=lambda item: item["order"],
+            reverse=True,
+        )
+
         if len(other_result) == 0:
             raise ParseError(msg="不存在其他的结果公告可以解析")
+
         return _make_detail_request(
             articleId=other_result[0]["articleId"],
             callback=self.parse_result_detail_content,

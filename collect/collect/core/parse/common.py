@@ -1,6 +1,17 @@
-__all__ = ["filter_texts", "startswith_chinese_number", "startswith_number_index"]
-
+from collect.collect.middlewares import ParseError
+from collect.collect.utils import symbol_tools as sym
 from lxml import etree
+
+from contant import constants
+
+
+__all__ = [
+    "filter_texts",
+    "startswith_chinese_number",
+    "startswith_number_index",
+    "parse_review_experts",
+    "parse_html",
+]
 
 filter_rules = [
     lambda text: isinstance(text, str),
@@ -88,4 +99,60 @@ def startswith_number_index(text: str) -> int:
     idx = text.find(".")
     if (idx == -1) or (not text[0].isdigit()):
         return -1
-    return int(text[:idx])
+    try:
+        value = int(text[:idx])
+    except ValueError:
+        value = -1
+    return value
+
+
+def parse_review_experts(part: list[str]) -> dict:
+    """
+    通用的 “评审小组” 部分解析
+    :param part:
+    :return:
+    """
+    data = dict()
+    # 拿到后面部分的内容
+    dist = part[-1]
+    # 拿到分隔符
+    split_symbol = sym.get_symbol(dist, [",", "，", "、"])
+    # 分隔
+    persons = dist.split(split_symbol)
+    # 评审小组
+    review_experts = []
+    data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
+    # 采购代表人
+    representors = []
+    data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representors
+
+    for person in persons:
+        # 采购人代表
+        if "采购人代表" in persons:
+            # 解析左右括号位置
+            l, r = sym.get_parentheses_position(person)
+            # 存在括号
+            if l != -1 and r != -1:
+                if l == 0:
+                    # 名字在括号的右边
+                    representor = persons[r + 1 :]
+                elif r == len(persons) - 1:
+                    # 名字在括号的左边
+                    representor = persons[:l]
+                else:
+                    raise ParseError(
+                        msg="评审专家解析部分-采购人部分出现特殊情况", content=part
+                    )
+            else:
+                raise ParseError(
+                    msg="评审专家解析部分-采购人部分出现特殊情况", content=part
+                )
+            representors.append(representor)
+            review_experts.append(representor)
+        # 非采购人代表
+        else:
+            if person == "/":
+                continue
+            review_experts.append(person)
+
+    return data

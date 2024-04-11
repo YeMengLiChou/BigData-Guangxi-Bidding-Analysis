@@ -1,19 +1,35 @@
 import logging
 import re
+import time
 
-from collect.collect.core.parse import AbstractFormatParser
+from collect.collect.core.parse import AbstractFormatParser, __all__, common
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import symbol_tools as sym
 from contant import constants
 
 logger = logging.getLogger(__name__)
 
+try:
+    from config.config import settings
+    _DEBUG = getattr(settings, "debug.enable", False)
+except ImportError:
+    _DEBUG = True
+
+if _DEBUG:
+    if len(logging.root.handlers) == 0:
+        logging.basicConfig(level=logging.DEBUG)
+
 
 def parse_not_win_bid(parts: list[list[str]]):
+    """
+    解析 “废标公告” 信息
+    :param parts:
+    :return:
+    """
     def is_reason(_title):
         return "废标理由" in _title
 
-    def is_preview(_title):
+    def is_review(_title):
         return "评审" in _title
 
     def is_termination_reason(_title):
@@ -22,10 +38,13 @@ def parse_not_win_bid(parts: list[list[str]]):
     data = dict()
     for part in parts:
         title = part[0]
-        if is_preview(title):
+        # “评审小组” 部分 （废标公告可能有）
+        if is_review(title):
             data.update(NotWinBidStandardFormatParser.parse_review_expert(part))
+        # “废标理由” 部分 （废标公告特有）
         elif is_reason(title):
             data.update(NotWinBidStandardFormatParser.parse_cancel_reason(part))
+        # “终止理由” 部分 （终止公告特有）
         elif is_termination_reason(title):
             data.update(NotWinBidStandardFormatParser.parse_termination_reason(part))
         else:
@@ -36,39 +55,18 @@ def parse_not_win_bid(parts: list[list[str]]):
 class NotWinBidStandardFormatParser(AbstractFormatParser):
     @staticmethod
     def parse_review_expert(part: list[str]) -> dict:
-        data = dict()
-        dist = part[-1]
+        start_time = 0
+        if _DEBUG:
+            start_time = time.time()
+            logger.debug(f"{log.get_function_name()} started")
 
-        split_symbol = sym.get_symbol(dist, [",", "，", "、"])
-        persons = dist.split(split_symbol)
-        review_experts = []
-        for person in persons:
-            # 采购人代表
-            if "采购人代表" in persons:
-                l, r = sym.get_parentheses_position(person)
-                if l != -1 and r != -1:
-                    if l == 0:
-                        # 名字在括号的右边
-                        representor = persons[r + 1 :]
-                    elif r == len(persons) - 1:
-                        # 名字在括号的左边
-                        representor = persons[:l]
-                    else:
-                        raise ParseError(
-                            msg="评审专家解析部分-采购人部分出现特殊情况", content=part
-                        )
-                else:
-                    raise ParseError(
-                        msg="评审专家解析部分-采购人部分出现特殊情况", content=part
-                    )
-                data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representor
-                review_experts.append(representor)
-            else:
-                if person == "/":
-                    continue
-                review_experts.append(persons)
-        data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
-        return data
+        try:
+            return common.parse_review_experts(part)
+        finally:
+            if _DEBUG:
+                logger.debug(
+                    f"{log.get_function_name()} finished, running: {time.time() - start_time}"
+                )
 
     @staticmethod
     def parse_cancel_reason(part: list[str]):
@@ -79,6 +77,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         bid_items = []
         data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
         for p in part:
+            # 解析出是第几个标项
             match = re.match(".*(分标|标项)([0-9]):(.*)", p)
             if match:
                 index, reason = match.group(1), match.group(2)

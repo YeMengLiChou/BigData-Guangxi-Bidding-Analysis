@@ -37,8 +37,9 @@ def parse_response_data(data: list):
     :param data:
     :return:
     """
-    start_time = time.time()
+    start_time = 0
     if _DEBUG:
+        start_time = time.time()
         logger.debug(f"DEBUG INFO: {log.get_function_name()} started")
 
     def check_is_win_bid(path_name: str) -> bool:
@@ -115,7 +116,6 @@ def parse_html(html_content: str, is_wid_bid: bool):
         logger.debug(f"DEBUG INFO: {log.get_function_name()} started")
 
     result = common.parse_html(html_content=html_content)
-    print('\n'.join(result))
 
     def check_useful_part(title: str) -> bool:
         """
@@ -151,7 +151,6 @@ def parse_html(html_content: str, is_wid_bid: bool):
     n, idx, parts = len(result), 0, []
     project_data, chinese_number_index = dict(), 1
     try:
-        # TODO: 将项目编号等信息从 purchase 转移到此处，保证 result 能够将所有基本信息爬取完毕（部分公告没有采购公告）
         while idx < n:
             # 找以 “一、” 这种格式开头的字符串
             index = common.startswith_chinese_number(result[idx])
@@ -186,15 +185,17 @@ def parse_html(html_content: str, is_wid_bid: bool):
     try:
         if is_wid_bid:
             data = win.parse_win_bid(parts)
+            # 返回值为 None，表示没有标项解析，需要切换
             if not data:
-                raise SwitchError()
+                raise SwitchError("该结果公告没有解析到标项信息")
             else:
                 data.update(project_data)
-                return data
         else:
+            # 废标结果可能没有标项信息，所以暂时不做判断
             data = not_win.parse_not_win_bid(parts)
             data.update(project_data)
-            return data
+
+        return data
     except SwitchError as e:
         raise e  # 不能被 raise_error所处理，直接抛出
     except BaseException as e:

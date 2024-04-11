@@ -14,18 +14,18 @@ def get_comma_symbol(s: str) -> Union[str, None]:
         return None
 
 
-def get_symbol(s: str, coordinators: list[str]) -> Union[str, None]:
+def get_symbol(s: str, candidates: list[str]) -> Union[str, None]:
     """
     从 coordinators 中获取 s 中存在的符号
     :param s:
-    :param coordinators:
+    :param candidates:
     :return:
     """
-    for sym in coordinators:
+    for sym in candidates:
         if sym in s:
             return sym
     else:
-        return None
+        raise ValueError(f"字符串 {s} 中没有 {candidates} 中的符号!")
 
 
 def get_parentheses_position(s: str) -> tuple[int, int]:
