@@ -1,5 +1,7 @@
 import json
 import logging
+import time
+from typing import Union
 
 import scrapy
 from scrapy import Request
@@ -7,11 +9,14 @@ from scrapy.http import Response
 
 from collect.collect.core.api.category import CategoryApi
 from collect.collect.core.api.detail import DetailApi
-from collect.collect.core.parse import result, purchase
+from collect.collect.core.parse import (
+    result,
+    purchase
+)
 from collect.collect.core.parse.result import SwitchError
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import redis_tools as redis
-from collect.collect.utils import time
+from collect.collect.utils import time as time_tools
 from contant import constants
 from collect.collect.utils import log
 
@@ -31,7 +36,7 @@ if _DEBUG:
 
 
 def _make_result_request(
-    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
+        pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
 ):
     """
     生成结果列表的请求
@@ -43,7 +48,7 @@ def _make_result_request(
     """
     # TODO: 根据redis中的缓存数据进行获取, redis 应该记录数据库中最新的数据
     publish_date_begin = redis.get_latest_announcement_timestamp() or "2020-01-01"
-    publish_date_end = redis.parse_timestamp(timestamp=time.now_timestamp())
+    publish_date_end = redis.parse_timestamp(timestamp=time_tools.now_timestamp())
 
     if _DEBUG:
         logger.debug(
@@ -97,36 +102,41 @@ def _parse_other_announcements(other_announcements):
     :param other_announcements:
     :return:
     """
-    start_time = time.now_timestamp()
+    start_time = 0
     if _DEBUG:
+        start_time = time.time()
         logger.debug(
             f"DEBUG INFO: {log.get_function_name()} started\n"
             f"other_announcements: {other_announcements}"
         )
+    try:
+        if not other_announcements:
+            return None
 
-    if not other_announcements:
+        # 过滤出存在且非当前结果公告的公告信息
+        exist_other_announcements = [
+            item
+            for item in other_announcements
+            if item.get("isExist", False) and not item.get("isCurrent", False)
+        ]
+        # 找出 采购公告
+        for item in exist_other_announcements:
+            if item["typeName"] == "采购公告":
+                return item["articleId"]
+
+        # 也有可能是 “其他公告”
+        for item in exist_other_announcements:
+            if item["typeName"] == "其他公告":
+                return item["articleId"]
+
+        # 存在没有 “采购公告” 的情况
+        logger.warning(
+            f"解析其他公告时未发现采购公告相关信息: other_announcements: {other_announcements}"
+        )
         return None
-    # 过滤出存在且非当前结果公告的公告信息
-    other_announcements = [
-        item
-        for item in other_announcements
-        if item.get("isExist", False) and not item.get("isCurrent", False)
-    ]
-    # 找出 采购公告
-    for item in other_announcements:
-        if item["typeName"] == "采购公告":
-            return item["articleId"]
-
-    # 也有可能是 “其他公告”
-    for item in other_announcements:
-        if item["typeName"] == "其他公告":
-            return item["articleId"]
-
-    # TODO 可能存在其他情况
-    raise ParseError(
-        msg="解析其他公告时未发现采购公告相关信息",
-        content=other_announcements,
-    )
+    finally:
+        if _DEBUG:
+            logger.debug(f"DEBUG INFO: {log.get_function_name()} finished. running: {time.time() - start_time}")
 
 
 def _merge_bid_items(_purchase: list, _result: list) -> list:
@@ -171,32 +181,35 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
     return _result
 
 
-def make_item(data: dict, purchase_data: dict):
+def make_item(data: dict, purchase_data: Union[dict, None]):
     """
     将 data 所需要的内容提取出来
     :param purchase_data:
     :param data:
     :return:
     """
+    start_time = 0
     if _DEBUG:
+        start_time = time.time()
         logger.debug(f"DEBUG INFO: {log.get_function_name()} started\n")
 
-    # 合并标项
-    purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
-    result_bid_items = data.get(constants.KEY_PROJECT_BID_ITEMS, [])
-    data[constants.KEY_PROJECT_BID_ITEMS] = _merge_bid_items(
-        _purchase=purchase_bid_items, _result=result_bid_items
-    )
-    # 项目编号和名称，以 api 返回为准，如果没有则用解析出来的补充
-    project_name = purchase_data.pop(constants.KEY_PROJECT_NAME, None)
-    project_code = purchase_data.pop(constants.KEY_PROJECT_CODE, None)
-    if not data.get(constants.KEY_PROJECT_NAME, None):
-        data[constants.KEY_PROJECT_NAME] = project_name
-    if not data.get(constants.KEY_PROJECT_CODE, None):
-        data[constants.KEY_PROJECT_CODE] = project_code
+    if purchase_data:
+        # 合并标项
+        purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
+        result_bid_items = data.get(constants.KEY_PROJECT_BID_ITEMS, [])
+        data[constants.KEY_PROJECT_BID_ITEMS] = _merge_bid_items(
+            _purchase=purchase_bid_items, _result=result_bid_items
+        )
+        # 项目编号和名称，以 api 返回为准，如果没有则用解析出来的补充
+        project_name = purchase_data.pop(constants.KEY_PROJECT_NAME, None)
+        project_code = purchase_data.pop(constants.KEY_PROJECT_CODE, None)
+        if not data.get(constants.KEY_PROJECT_NAME, None):
+            data[constants.KEY_PROJECT_NAME] = project_name
+        if not data.get(constants.KEY_PROJECT_CODE, None):
+            data[constants.KEY_PROJECT_CODE] = project_code
 
-    # 其他内容信息直接合并
-    data.update(purchase_data)
+        # 其他内容信息直接合并
+        data.update(purchase_data)
 
     # 从 data 中取出所需要的信息
     item = dict()
@@ -249,7 +262,7 @@ def make_item(data: dict, purchase_data: dict):
         constants.KEY_PROJECT_REVIEW_EXPERT, []
     )
     if _DEBUG:
-        logger.debug(f"DEBUG INFO: {log.get_function_name()} finished\n")
+        logger.debug(f"DEBUG INFO: {log.get_function_name()} finished. running: {time.time() - start_time}")
 
     return item
 
@@ -321,7 +334,9 @@ class BiddingSpider(scrapy.Spider):
         :param response:
         :return:
         """
+        start_time = 0
         if _DEBUG:
+            start_time = time.time()
             logger.debug(f"DEBUG INFO: {log.get_function_name()} started")
 
         response_body = json.loads(response.text)
@@ -357,12 +372,22 @@ class BiddingSpider(scrapy.Spider):
                 other_announcements=data["announcementLinkDtoList"]
             )
 
-            if _DEBUG:
-                logger.debug(f"DEBUG INFO: {log.get_function_name()} yield")
+            # 存在 “采购公告”
+            if purchase_article_id:
+                if _DEBUG:
+                    logger.debug(f"DEBUG INFO: {log.get_function_name()} yield. running: {time.time() - start_time}")
 
-            yield _make_detail_request(
-                articleId=purchase_article_id, callback=self.parse_purchase, meta=meta
-            )
+                yield _make_detail_request(
+                    articleId=purchase_article_id, callback=self.parse_purchase, meta=meta
+                )
+            else:
+                # 没有 “采购公告”，直接进入 make_item 生成 item
+                if _DEBUG:
+                    logger.debug(
+                        f"DEBUG INFO: {log.get_function_name()} finished (no purchase). running: {time.time() - start_time} ")
+
+                yield make_item(data=meta, purchase_data=None)
+
         else:
             # TODO: 加入 retry 功能
             self.logger.error(f"result response not success: {response.text}")
@@ -378,8 +403,8 @@ class BiddingSpider(scrapy.Spider):
             item
             for item in other_announcements
             if item["typeName"] == "结果公告"
-            and not item["isCurrent"]
-            and item["isExist"]
+               and not item["isCurrent"]
+               and item["isExist"]
         ]
         if len(other_result) == 0:
             raise ParseError(msg="不存在其他的结果公告可以解析")

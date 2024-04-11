@@ -3,19 +3,16 @@ import logging
 import time
 from typing import Type
 
-from lxml import etree
-
 from collect.collect.core.parse import common, AbstractFormatParser
-from collect.collect.utils import log, symbol_tools as sym
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
+from collect.collect.utils import log, symbol_tools as sym
 from contant import constants
 
 logger = logging.getLogger(__name__)
 
 try:
     from config.config import settings
-
     _DEBUG = getattr(settings, "debug.enable", False)
 except ImportError:
     _DEBUG = True
