@@ -230,7 +230,8 @@ class BiddingSpider(scrapy.Spider):
 
     @classmethod
     def from_crawler(cls, crawler: Crawler, *args: Any, **kwargs: Any) -> Self:
-        obj = cls()
+        obj = cls(*args, **kwargs)
+        obj._set_crawler(crawler)
         crawler.signals.connect(obj.spider_closed, signal=signals.spider_closed)
         return obj
 
