@@ -130,33 +130,34 @@ def parse_review_experts(part: list[str]) -> dict:
     representors = []
     data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representors
 
-    for person in persons:
-        # 采购人代表
-        if "采购人代表" in persons:
-            # 解析左右括号位置
-            l, r = sym.get_parentheses_position(person)
-            # 存在括号
-            if l != -1 and r != -1:
-                if l == 0:
-                    # 名字在括号的右边
-                    representor = persons[r + 1 :]
-                elif r == len(persons) - 1:
-                    # 名字在括号的左边
-                    representor = persons[:l]
-                else:
-                    raise ParseError(
-                        msg="评审专家解析部分-采购人部分出现特殊情况", content=part
-                    )
+    for p in persons:
+        # 部分去掉句号
+        p = p.replace("。", "")
+        # 判断是否有括号
+        l, r = sym.get_parentheses_position(p)
+        # 存在括号
+        if l != -1 and r != -1:
+            # 名字在括号的右边：（xxx）名字
+            if l == 0:
+                result = p[r + 1:]
+            # 名字在括号的左边： 名字（xxx）
+            elif r == len(p) - 1:
+                result = p[:l]
             else:
                 raise ParseError(
-                    msg="评审专家解析部分-采购人部分出现特殊情况", content=part
+                    msg="评审专家解析部分出现特殊情况", content=part.append(f"{p} l:{l}, r:{r}")
                 )
-            representors.append(representor)
-            review_experts.append(representor)
-        # 非采购人代表
-        else:
-            if person == "/":
+            # 去掉括号加入到评审小组
+            review_experts.append(result)
+            # 加入到采购代表人
+            if "采购" in p[l + 1: r]:
+                representors.append(result)
+        elif l == -1 and r == -1:
+            if p == "/":
                 continue
-            review_experts.append(person)
-
+            review_experts.append(p)
+        else:
+            raise ParseError(
+                msg="评审专家解析部分出现特殊情况", content=part.append(p)
+            )
     return data
