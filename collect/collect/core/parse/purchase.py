@@ -6,20 +6,10 @@ from typing import Type
 from collect.collect.core.parse import common, AbstractFormatParser
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import log, symbol_tools as sym
+from collect.collect.utils import log, symbol_tools as sym, debug_stats as stats
 from contant import constants
 
 logger = logging.getLogger(__name__)
-
-try:
-    from config.config import settings
-    _DEBUG = getattr(settings, "debug.enable", False)
-except ImportError:
-    _DEBUG = True
-
-if _DEBUG:
-    if len(logging.root.handlers) == 0:
-        logging.basicConfig(level=logging.DEBUG)
 
 
 class StandardFormatParser(AbstractFormatParser):
@@ -28,16 +18,13 @@ class StandardFormatParser(AbstractFormatParser):
     """
 
     @staticmethod
+    @stats.function_stats(logger)
     def parse_project_base_situation(part: list[str]) -> dict:
         """
         解析 项目基本情况
         :param part:
         :return:
         """
-        start_time = 0
-        if _DEBUG:
-            start_time = time.time()
-            logger.debug(f"{log.get_function_name()} started")
 
         def get_colon_symbol(s: str) -> str:
             if s.endswith(":"):
@@ -70,86 +57,74 @@ class StandardFormatParser(AbstractFormatParser):
                 )
             return item
 
-        try:
-            data, bid_items = dict(), []
-            n, idx = len(part), 0
-            bid_item_index = 1
-            while idx < n:
-                text = part[idx]
-                # 项目编号
-                if check_project_code(text):
-                    if not sym.endswith_colon_symbol(text):
-                        colon_symbol = get_colon_symbol(text)
-                        project_code = text.split(colon_symbol)[-1]
-                        idx += 1
-                    else:
-                        project_code = part[idx + 1]
-                        idx += 2
-                    data[constants.KEY_PROJECT_CODE] = project_code
-                # 项目名称
-                elif check_project_name(text):
-                    if not sym.endswith_colon_symbol(text):
-                        colon_symbol = get_colon_symbol(text)
-                        project_name = text.split(colon_symbol)[-1]
-                        idx += 1
-                    else:
-                        project_name = part[idx + 1]
-                        idx += 2
-                    data[constants.KEY_PROJECT_NAME] = project_name
-                # 总预算
-                elif "预算总金额" in text:
-                    budget = float(part[idx + 1])
-                    data[constants.KEY_PROJECT_TOTAL_BUDGET] = budget
-                    idx += 2
-                # 标项解析
-                elif text.startswith("标项名称"):
-                    bid_item = dict()
+        data, bid_items = dict(), []
+        n, idx = len(part), 0
+        bid_item_index = 1
+        while idx < n:
+            text = part[idx]
+            # 项目编号
+            if check_project_code(text):
+                if not sym.endswith_colon_symbol(text):
+                    colon_symbol = get_colon_symbol(text)
+                    project_code = text.split(colon_symbol)[-1]
                     idx += 1
-                    # 标项名称
-                    bid_item[constants.KEY_BID_ITEM_NAME] = part[idx]
-                    idx += 1
-                    while idx < n and not part[idx].startswith("标项名称"):
-                        # 标项采购数量
-                        if check_bid_item_quantity(part[idx]):
-                            quantity = part[idx + 1]
-                            if quantity == "不限":
-                                quantity = constants.BID_ITEM_QUANTITY_UNLIMITED
-                            bid_item[constants.KEY_BID_ITEM_QUANTITY] = quantity
-                            idx += 2
-                        # 标项预算金额
-                        elif check_bid_item_budget(part[idx]):
-                            bid_item[constants.KEY_BID_ITEM_BUDGET] = float(
-                                part[idx + 1]
-                            )
-                            idx += 2
-                        else:
-                            idx += 1
-                    bid_item[constants.KEY_BID_ITEM_INDEX] = bid_item_index
-                    bid_item_index += 1
-                    bid_items.append(complete_purchase_bid_item(bid_item))
                 else:
+                    project_code = part[idx + 1]
+                    idx += 2
+                data[constants.KEY_PROJECT_CODE] = project_code
+            # 项目名称
+            elif check_project_name(text):
+                if not sym.endswith_colon_symbol(text):
+                    colon_symbol = get_colon_symbol(text)
+                    project_name = text.split(colon_symbol)[-1]
                     idx += 1
-            data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
+                else:
+                    project_name = part[idx + 1]
+                    idx += 2
+                data[constants.KEY_PROJECT_NAME] = project_name
+            # 总预算
+            elif "预算总金额" in text:
+                budget = float(part[idx + 1])
+                data[constants.KEY_PROJECT_TOTAL_BUDGET] = budget
+                idx += 2
+            # 标项解析
+            elif text.startswith("标项名称"):
+                bid_item = dict()
+                idx += 1
+                # 标项名称
+                bid_item[constants.KEY_BID_ITEM_NAME] = part[idx]
+                idx += 1
+                while idx < n and not part[idx].startswith("标项名称"):
+                    # 标项采购数量
+                    if check_bid_item_quantity(part[idx]):
+                        quantity = part[idx + 1]
+                        if quantity == "不限":
+                            quantity = constants.BID_ITEM_QUANTITY_UNLIMITED
+                        bid_item[constants.KEY_BID_ITEM_QUANTITY] = quantity
+                        idx += 2
+                    # 标项预算金额
+                    elif check_bid_item_budget(part[idx]):
+                        bid_item[constants.KEY_BID_ITEM_BUDGET] = float(part[idx + 1])
+                        idx += 2
+                    else:
+                        idx += 1
+                bid_item[constants.KEY_BID_ITEM_INDEX] = bid_item_index
+                bid_item_index += 1
+                bid_items.append(complete_purchase_bid_item(bid_item))
+            else:
+                idx += 1
+        data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
 
-            return data
-        finally:
-            if _DEBUG:
-                logger.debug(
-                    f"{log.get_function_name()} cost: {time.time() - start_time}"
-                )
+        return data
 
     @staticmethod
+    @stats.function_stats(logger)
     def parse_project_contact(part: list[str]) -> dict:
         """
         解析 以下方式联系 部分
         :param part:
         :return:
         """
-
-        start_time = 0
-        if _DEBUG:
-            start_time = time.time()
-            logger.debug(f"{log.get_function_name()} started")
 
         def check_information_begin(s: str) -> bool:
             return common.startswith_number_index(s) >= 1
@@ -177,61 +152,51 @@ class StandardFormatParser(AbstractFormatParser):
             return startswith_contact_method and endswith_colon
 
         data, n, idx = dict(), len(part), 0
-        try:
-            while idx < n:
-                text = part[idx]
-                if check_information_begin(text):
-                    # 采购人 / 采购代理机构信息
-                    key_word = text[2:]
-                    idx += 1
-                    info = dict()
-                    # 开始解析内容
-                    while idx < n and not check_information_begin(part[idx]):
-                        # 名称
-                        if check_name(part[idx]):
-                            info["name"] = part[idx + 1]
-                            idx += 2
-                        # 地址
-                        elif check_address(part[idx]):
-                            info["address"] = part[idx + 1]
-                            idx += 2
-                        # 联系人
-                        elif check_person(part[idx]):
-                            info["person"] = part[idx + 1].split("、")
-                            idx += 2
-                        # 联系方式
-                        elif check_contact_method(part[idx]):
-                            info["contact_method"] = part[idx + 1]
-                            idx += 2
-                        else:
-                            idx += 1
+        while idx < n:
+            text = part[idx]
+            if check_information_begin(text):
+                # 采购人 / 采购代理机构信息
+                key_word = text[2:]
+                idx += 1
+                info = dict()
+                # 开始解析内容
+                while idx < n and not check_information_begin(part[idx]):
+                    # 名称
+                    if check_name(part[idx]):
+                        info["name"] = part[idx + 1]
+                        idx += 2
+                    # 地址
+                    elif check_address(part[idx]):
+                        info["address"] = part[idx + 1]
+                        idx += 2
+                    # 联系人
+                    elif check_person(part[idx]):
+                        info["person"] = part[idx + 1].split("、")
+                        idx += 2
+                    # 联系方式
+                    elif check_contact_method(part[idx]):
+                        info["contact_method"] = part[idx + 1]
+                        idx += 2
+                    else:
+                        idx += 1
 
-                    # 加入到 data 中
-                    if key_word.startswith("采购人"):
-                        data[constants.KEY_PURCHASER_INFORMATION] = info
-                    elif key_word.startswith("采购代理机构"):
-                        data[constants.KEY_PURCHASER_AGENCY_INFORMATION] = info
-                else:
-                    idx += 1
-            return data
-        finally:
-            if _DEBUG:
-                logger.debug(
-                    f"{log.get_function_name()} cost: {time.time() - start_time}"
-                )
+                # 加入到 data 中
+                if key_word.startswith("采购人"):
+                    data[constants.KEY_PURCHASER_INFORMATION] = info
+                elif key_word.startswith("采购代理机构"):
+                    data[constants.KEY_PURCHASER_AGENCY_INFORMATION] = info
+            else:
+                idx += 1
+        return data
 
 
+@stats.function_stats(logger)
 def parse_html(html_content: str):
     """
     解析 采购公告 的详情信息
     :param html_content:
     :return:
     """
-    start_time = 0
-    if _DEBUG:
-        start_time = time.time()
-        logger.debug(f"{log.get_function_name()} started")
-
     result = common.parse_html(html_content=html_content)
 
     def check_useful_part(title: str) -> bool:
@@ -269,10 +234,6 @@ def parse_html(html_content: str):
                 idx += 1
     except BaseException as e:
         raise_error(error=e, msg="解析 parts 出现未完善情况", content=result)
-        if _DEBUG:
-            logger.debug(
-                f"{log.get_function_name()} (raise) cost: {time.time() - start_time}"
-            )
 
     parts_length = len(parts)
     try:
@@ -285,11 +246,9 @@ def parse_html(html_content: str):
             )
     except BaseException as e:
         raise_error(error=e, msg="解析 __parse_standard_format 失败", content=parts)
-    finally:
-        if _DEBUG:
-            logger.debug(f"{log.get_function_name()} cost: {time.time() - start_time}")
 
 
+@stats.function_stats(logger)
 def _parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
     """
     解析 parts 部分

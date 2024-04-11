@@ -1,8 +1,9 @@
+import logging
 import re
 
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import calculate
+from collect.collect.utils import calculate, debug_stats as stats
 
 __all__ = [
     "purchase",
@@ -10,6 +11,8 @@ __all__ = [
     "result",
     "AbstractFormatParser",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractFormatParser:
@@ -21,6 +24,7 @@ class AbstractFormatParser:
         raise NotImplementedError("AbstractFormatParser is not instantiable")
 
     @staticmethod
+    @stats.function_stats(logger)
     def parse_win_bid_item_amount(string: str) -> tuple[float, bool]:
         """
         解析中标结果中的项目金额

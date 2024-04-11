@@ -1,9 +1,12 @@
+import logging
+
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import symbol_tools as sym
+from collect.collect.utils import symbol_tools as sym, debug_stats as stats
 from lxml import etree
 
 from contant import constants
 
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "filter_texts",
@@ -106,6 +109,7 @@ def startswith_number_index(text: str) -> int:
     return value
 
 
+@stats.function_stats(logger)
 def parse_review_experts(part: list[str]) -> dict:
     """
     通用的 “评审小组” 部分解析

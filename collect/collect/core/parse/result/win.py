@@ -1,32 +1,17 @@
 import logging
-import time
 from typing import Type
-from contant import constants
 
 from collect.collect.core.parse import (
     AbstractFormatParser,
     common,
 )
-from collect.collect.utils import (
-    log,
-    symbol_tools as sym,
-)
-from collect.collect.middlewares import ParseError
+from collect.collect.utils import debug_stats as stats
+from contant import constants
 
 logger = logging.getLogger(__name__)
 
-try:
-    from config.config import settings
 
-    _DEBUG = getattr(settings, "debug.enable", False)
-except ImportError:
-    _DEBUG = True
-
-if _DEBUG:
-    if len(logging.root.handlers) == 0:
-        logging.basicConfig(level=logging.DEBUG)
-
-
+@stats.function_stats(logger)
 def parse_win_bid(parts: list[list[str]]) -> dict | None:
     """
     解析 中标结果
@@ -92,6 +77,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
     """
 
     @staticmethod
+    @stats.function_stats(logger)
     def _parse_win_bids(part: list[str]) -> list:
         """
         解析 中标结果
@@ -99,61 +85,48 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         :return:
         """
 
-        start_time = time.time()
-        if _DEBUG:
-            logger.debug(f"DEBUG INFO: {log.get_function_name()} started")
-
         def is_bid_item_index(s: str) -> bool:
             return s.isdigit()
 
-        try:
-            idx, n, data = 0, len(part), []
-            while idx < n:
-                text = part[idx]
-                # 当前是序号
-                if is_bid_item_index(text):
-                    bid_item = dict()
-                    # 中标金额
-                    price_text = part[idx + 1]
-                    # 中标供应商
-                    supplier_text = part[idx + 2]
-                    # 中标供应商地址
-                    pre = idx + 3
-                    idx += 3
-                    while idx < n and not is_bid_item_index(part[idx]):
-                        idx += 1
-                    address_text = "".join(part[pre:idx])
-                    bid_item[constants.KEY_BID_ITEM_INDEX] = int(text)
-                    bid_item[constants.KEY_BID_ITEM_NAME] = None
-                    amount, is_percent = AbstractFormatParser.parse_win_bid_item_amount(
-                        string=price_text
-                    )
-                    bid_item[constants.KEY_BID_ITEM_AMOUNT] = amount
-                    bid_item[constants.KEY_BID_ITEM_IS_PERCENT] = is_percent
-                    bid_item[constants.KEY_BID_ITEM_SUPPLIER] = supplier_text
-                    bid_item[constants.KEY_BID_ITEM_SUPPLIER_ADDRESS] = address_text
-                    data.append(bid_item)
-                else:
+        idx, n, data = 0, len(part), []
+        while idx < n:
+            text = part[idx]
+            # 当前是序号
+            if is_bid_item_index(text):
+                bid_item = dict()
+                # 中标金额
+                price_text = part[idx + 1]
+                # 中标供应商
+                supplier_text = part[idx + 2]
+                # 中标供应商地址
+                pre = idx + 3
+                idx += 3
+                while idx < n and not is_bid_item_index(part[idx]):
                     idx += 1
-
-            return data
-        finally:
-            if _DEBUG:
-                logger.debug(
-                    f"{log.get_function_name()} finished, running: {time.time() - start_time}"
+                address_text = "".join(part[pre:idx])
+                bid_item[constants.KEY_BID_ITEM_INDEX] = int(text)
+                bid_item[constants.KEY_BID_ITEM_NAME] = None
+                amount, is_percent = AbstractFormatParser.parse_win_bid_item_amount(
+                    string=price_text
                 )
+                bid_item[constants.KEY_BID_ITEM_AMOUNT] = amount
+                bid_item[constants.KEY_BID_ITEM_IS_PERCENT] = is_percent
+                bid_item[constants.KEY_BID_ITEM_SUPPLIER] = supplier_text
+                bid_item[constants.KEY_BID_ITEM_SUPPLIER_ADDRESS] = address_text
+                data.append(bid_item)
+            else:
+                idx += 1
+
+        return data
 
     @staticmethod
+    @stats.function_stats(logger)
     def _parse_not_win_bids(part: list[str]) -> list:
         """
         解析其中的废标项
         :param part:
         :return:
         """
-        start_time = 0
-        if _DEBUG:
-            start_time = time.time()
-            logger.debug(f"{log.get_function_name()} started")
 
         def is_bid_item_index(s: str) -> bool:
             return s.isdigit()
@@ -169,35 +142,26 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             item[constants.KEY_BID_ITEM_SUPPLIER_ADDRESS] = None
             return item
 
-        try:
-            idx, n, data = 0, len(part), []
-            while idx < n:
-                if is_bid_item_index(part[idx]):
-                    bid_item = make_bid_item(
-                        index=int(part[idx]), name=part[idx + 1], reason=part[idx + 2]
-                    )
-                    idx += 4
-                    data.append(bid_item)
-                else:
-                    idx += 1
-            return data
-        finally:
-            if _DEBUG:
-                logger.debug(
-                    f"{log.get_function_name()} finished, running: {time.time() - start_time}"
+        idx, n, data = 0, len(part), []
+        while idx < n:
+            if is_bid_item_index(part[idx]):
+                bid_item = make_bid_item(
+                    index=int(part[idx]), name=part[idx + 1], reason=part[idx + 2]
                 )
+                idx += 4
+                data.append(bid_item)
+            else:
+                idx += 1
+        return data
 
     @staticmethod
+    @stats.function_stats(logger)
     def parse_bids_information(part: list[str]) -> list:
         """
         解析中标信息
         :param part:
         :return:
         """
-        start_time = 0
-        if _DEBUG:
-            start_time = time.time()
-            logger.debug(f"{log.get_function_name()} started")
 
         def is_win_bid_result(s: str) -> bool:
             """
@@ -223,46 +187,30 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 and (s.endswith("：") or s.endswith(":"))
             )
 
-        try:
-            data, idx, n = [], 1, len(part)
-            while idx < n:
-                text = part[idx]
-                # 判断标题为 “1.中标结果”
-                if is_win_bid_result(text):
-                    pre = idx + 1
-                    while idx < n and not is_not_win_bid_result(part[idx]):
-                        idx += 1
-                    data.extend(
-                        WinBidStandardFormatParser._parse_win_bids(part=part[pre:idx])
-                    )
-                # 判断标题为 “2.废标结果”
-                elif is_not_win_bid_result(text):
-                    res = WinBidStandardFormatParser._parse_not_win_bids(
-                        part=part[idx + 1 :]
-                    )
-                    if len(res) > 0:
-                        data.extend(res)
+        data, idx, n = [], 1, len(part)
+        while idx < n:
+            text = part[idx]
+            # 判断标题为 “1.中标结果”
+            if is_win_bid_result(text):
+                pre = idx + 1
+                while idx < n and not is_not_win_bid_result(part[idx]):
                     idx += 1
-                else:
-                    idx += 1
-            return data
-        finally:
-            if _DEBUG:
-                logger.debug(
-                    f"{log.get_function_name()} finished, running: {time.time() - start_time}"
+                data.extend(
+                    WinBidStandardFormatParser._parse_win_bids(part=part[pre:idx])
                 )
+            # 判断标题为 “2.废标结果”
+            elif is_not_win_bid_result(text):
+                res = WinBidStandardFormatParser._parse_not_win_bids(
+                    part=part[idx + 1 :]
+                )
+                if len(res) > 0:
+                    data.extend(res)
+                idx += 1
+            else:
+                idx += 1
+        return data
 
     @staticmethod
+    @stats.function_stats(logger)
     def parse_review_expert(part: list[str]) -> dict:
-        start_time = 0
-        if _DEBUG:
-            start_time = time.time()
-            logger.debug(f"{log.get_function_name()} started")
-
-        try:
-            return common.parse_review_experts(part)
-        finally:
-            if _DEBUG:
-                logger.debug(
-                    f"{log.get_function_name()} finished, running: {time.time() - start_time}"
-                )
+        return common.parse_review_experts(part)
