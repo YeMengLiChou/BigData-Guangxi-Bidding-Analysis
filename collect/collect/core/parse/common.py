@@ -5,7 +5,7 @@ from collect.collect.middlewares import ParseError
 from collect.collect.utils import symbol_tools as sym, debug_stats as stats
 from lxml import etree
 
-from contant import constants
+from constant import constants
 
 logger = logging.getLogger(__name__)
 

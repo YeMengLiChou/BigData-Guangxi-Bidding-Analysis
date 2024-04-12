@@ -4,7 +4,7 @@ from typing import Union
 from collect.collect.core.parse import common, errorhandle
 from collect.collect.core.parse.result import not_win, win
 from collect.collect.utils import debug_stats as stats
-from contant import constants
+from constant import constants
 
 try:
     from .not_win import parse_not_win_bid

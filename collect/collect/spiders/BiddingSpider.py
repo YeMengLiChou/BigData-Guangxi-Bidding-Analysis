@@ -19,7 +19,7 @@ from collect.collect.utils import (
     time as time_tools,
     debug_stats as stats,
 )
-from contant import constants
+from constant import constants
 
 logger = logging.getLogger(__name__)
 
