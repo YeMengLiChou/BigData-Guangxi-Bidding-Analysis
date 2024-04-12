@@ -61,14 +61,17 @@ class UpdateRedisInfoPipeline:
     def process_item(self, item, spider: Spider):
         self.stats.inc_value("redis-update/process_items_count")
 
-        # 更新两个公告的id，如果其中一个缺失，表示爬取存在问题
+        # 更新两个公告的id，仅有结果公告能够存在表示item数据正常
         purchase_id = item.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None)
         result_id = item.get(constants.KEY_PROJECT_RESULT_ARTICLE_ID, None)
-        if purchase_id and result_id:
-            redis.add_unique_article_id(purchase_id)
+        if result_id:
+            if purchase_id:
+                redis.add_unique_article_id(purchase_id)
             redis.add_unique_article_id(result_id)
 
         # 结果公告的发布日期作为标准
-        result_publish_date = item.get(constants.KEY_PROJECT_RESULT_PUBLISH_DATE)
+        result_publish_date = item.get(constants.KEY_PROJECT_RESULT_PUBLISH_DATE, None)
         if result_publish_date:
             redis.set_latest_announcement_timestamp(timestamp=result_publish_date)
+
+        return item

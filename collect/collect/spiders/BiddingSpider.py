@@ -256,7 +256,7 @@ class BiddingSpider(scrapy.Spider):
     # ========== use for debug ================
     special_article_ids = [
         # template: ("article_id", is_win: bool)
-        ("/VzMNpuL7TfpTeW1j2JlvQ%3D%3D", True)
+        # ("/VzMNpuL7TfpTeW1j2JlvQ%3D%3D", True)
     ]
 
     #  =========================================
@@ -302,7 +302,6 @@ class BiddingSpider(scrapy.Spider):
         else:
             # TODO: 加入 retry 功能
             self.logger.error(f"response not success: {response.text}")
-            pass
 
     @stats.function_stats(logger)
     def parse_result_data(self, response: Response):
@@ -362,7 +361,6 @@ class BiddingSpider(scrapy.Spider):
                     other_announcements=data["announcementLinkDtoList"], meta=meta
                 )
                 return
-            # TODO：关闭去重
 
             # 解析其他公告的结果
             purchase_article_id = _parse_other_announcements(
@@ -372,7 +370,6 @@ class BiddingSpider(scrapy.Spider):
 
             # 存在 “采购公告”
             if purchase_article_id:
-                logger.warning("存在采购公告")
                 yield _make_detail_request(
                     articleId=purchase_article_id,
                     callback=self.parse_purchase,
