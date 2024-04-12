@@ -162,8 +162,11 @@ def parse_html(html_content: str, is_wid_bid: bool):
     try:
         if is_wid_bid:
             data = win.parse_win_bid(parts)
-            # 返回值为 None，表示没有标项解析，需要切换
-            if not data:
+            # 表示没有标项解析，需要切换
+            if not data.get(constants.KEY_PROJECT_BID_ITEMS, None):
+                logger.warning(
+                    "该结果公告没有爬取到任何标项信息！尝试切换 other_announcements 进行查找！"
+                )
                 raise SwitchError("该结果公告没有解析到标项信息")
             else:
                 data.update(project_data)

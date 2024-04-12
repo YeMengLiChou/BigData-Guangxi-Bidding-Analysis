@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @stats.function_stats(logger)
-def parse_win_bid(parts: list[list[str]]) -> dict | None:
+def parse_win_bid(parts: list[list[str]]) -> dict:
     """
     解析 中标结果
     :param parts:
@@ -55,19 +55,11 @@ def parse_win_bid(parts: list[list[str]]) -> dict | None:
             bid_items = parse_bids_information(
                 _part=part, parser=WinBidStandardFormatParser
             )
-            # 如果没有标项，需要切换到其他结果公告解析
-            if len(bid_items) == 0:
-                logger.warning(
-                    "该结果公告没有爬取到任何标项信息！尝试切换 other_announcements 进行查找！"
-                )
-                return None
-            else:
-                data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
+            data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
         elif is_review_expert(title=part[0]):
             data.update(
                 parse_review_expert(_part=part, parser=WinBidStandardFormatParser)
             )
-
     return data
 
 

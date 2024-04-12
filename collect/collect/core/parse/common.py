@@ -21,7 +21,7 @@ filter_rules = [
     lambda text: len(text) > 0,  # 过滤空字符串
     lambda text: text not in ['"', "“", "”", "\\n"],  # 过滤双引号、转义回车符
     lambda text: "th, td {\n    border: 1px solid #DDD;\n    padding: 5px 10px;\n}"
-    not in text,
+                 not in text,
 ]
 
 chinese_number_mapper = {
@@ -118,7 +118,10 @@ def parse_review_experts(part: list[str]) -> dict:
     """
     data = dict()
     # 拿到后面部分的内容
-    dist = part[-1]
+    dist = (
+        part[-1]
+        .replace("评审专家名单：", '')  # 部分带有该前缀
+    )
     # 拿到分隔符
     split_symbol = sym.get_symbol(dist, [",", "，", "、"])
     # 分隔

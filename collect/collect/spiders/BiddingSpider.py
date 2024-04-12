@@ -72,19 +72,22 @@ def _make_detail_request(articleId: str, callback: callable, meta: dict):
         callback=callback,
         method=DetailApi.method,
         meta=meta,
+        dont_filter=True
     )
 
 
 @stats.function_stats(logger)
-def _parse_other_announcements(other_announcements):
+def _parse_other_announcements(other_announcements: list, meta: dict):
     """
     解析 announcementLinkDtoList 中的信息，得到采购公告的 articleId
     :param other_announcements:
     :return:
     """
-
     if not other_announcements:
         return None
+
+    if meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None):
+        return meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
 
     # 过滤出存在且非当前结果公告的公告信息
     exist_other_announcements = sorted(
@@ -121,6 +124,7 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
     :param _result:
     :return:
     """
+    # TODO: 可能部分标项信息的index不一致，需要其他方法来进行实现
     _purchase.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
     _result.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
 
@@ -134,6 +138,17 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
     for idx in range(n):
         purchase_item = _purchase[idx]
         result_item = _result[idx]
+        # 标项名称不一致
+        if (result_item.get(constants.KEY_BID_ITEM_NAME, None)
+                and purchase_item[constants.KEY_BID_ITEM_NAME] != result_item[constants.KEY_BID_ITEM_NAME]
+        ):
+            raise ParseError(
+                msg="标项名称不一致",
+                content=[
+                    f"purchase item: {purchase_item}, result item: {result_item}"
+                ],
+            )
+
         result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
             constants.KEY_BID_ITEM_NAME
         ]
@@ -282,7 +297,7 @@ class BiddingSpider(scrapy.Spider):
             self.logger.debug(f"initial fetch amount: {total}")
             for i in range(1, total // 100 + 2):
                 yield _make_result_request(
-                    pageNo=i, pageSize=100, callback=self.parse_result_data
+                    pageNo=i, pageSize=100, callback=self.parse_result_data, dont_filter=True
                 )
         else:
             # TODO: 加入 retry 功能
@@ -346,14 +361,18 @@ class BiddingSpider(scrapy.Spider):
                 yield self.switch_other_result_announcement(
                     other_announcements=data["announcementLinkDtoList"], meta=meta
                 )
+                return
+            # TODO：关闭去重
 
             # 解析其他公告的结果
             purchase_article_id = _parse_other_announcements(
-                other_announcements=data["announcementLinkDtoList"]
+                other_announcements=data["announcementLinkDtoList"],
+                meta=meta
             )
 
             # 存在 “采购公告”
             if purchase_article_id:
+                logger.warning("存在采购公告")
                 yield _make_detail_request(
                     articleId=purchase_article_id,
                     callback=self.parse_purchase,
@@ -367,35 +386,37 @@ class BiddingSpider(scrapy.Spider):
             self.logger.error(f"result response not success: {response.text}")
 
     @stats.function_stats(logger)
-    def switch_other_result_announcement(self, other_announcements, meta):
+    def switch_other_result_announcement(self, other_announcements, meta: dict):
         """
         切换其他结果公告
         :param meta:
         :param other_announcements:
         :return:
         """
-        # 对 order 进行排序，取order最大的
-        other_result = sorted(
-            # 过滤出所有结果公告
-            [
-                item
-                for item in other_announcements
-                if (item["typeName"] == "结果公告")
-                   and (not item["isCurrent"])
-                   and item["isExist"]
-            ],
-            key=lambda item: item["order"],
-            reverse=True,
-        )
+        # 拿到 结果公告 和 采购公告（部分情况存在结果公告有采购，但是切换之后没有采购公告）
+        result_article_id, result_order = None, -1
+        purchase_article_id, purchase_order = None, -1
 
-        if len(other_result) == 0:
-            raise ParseError(msg="不存在其他的结果公告可以解析")
+        for item in other_announcements:
+            if item['isCurrent'] or (not item['isExist']):
+                continue
 
-        return _make_detail_request(
-            articleId=other_result[0]["articleId"],
-            callback=self.parse_result_detail_content,
-            meta=meta,
-        )
+            if item['typeName'] in ('结果公告', "成交公告", "终止公告") and item['order'] > result_order:
+                result_article_id, result_order = item['articleId'], item['order']
+                continue
+
+            if item['typeName'] in ('采购公告', '采购结果') and item['order'] > purchase_order:
+                purchase_article_id, purchase_order = item['articleId'], item['order']
+
+        if result_article_id:
+            logger.warning(f"已经切换到 {result_article_id} 结果公告进行爬取")
+            meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = purchase_article_id
+            return _make_detail_request(
+                articleId=result_article_id,
+                callback=self.parse_result_detail_content,
+                meta=meta,
+            )
+        raise ParseError(msg="不存在其他的结果公告可以解析")
 
     @stats.function_stats(logger)
     def parse_purchase(self, response: Response):

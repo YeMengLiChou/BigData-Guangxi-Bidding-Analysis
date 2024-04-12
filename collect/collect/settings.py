@@ -93,7 +93,7 @@ FEED_EXPORT_ENCODING = "utf-8"
 
 # ======== ResponseDebugMiddleware =================
 # 是否设置 ResponseDebugMiddleware 的调试
-RESPONSE_DEBUG = False
+RESPONSE_DEBUG = True
 
 RESPONSE_DEBUG_LOG_DIR = "logs"
 
