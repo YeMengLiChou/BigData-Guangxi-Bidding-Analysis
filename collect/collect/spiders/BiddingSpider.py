@@ -256,7 +256,7 @@ class BiddingSpider(scrapy.Spider):
     # ========== use for debug ================
     special_article_ids = [
         # template: ("article_id", is_win: bool)
-        # ("/VzMNpuL7TfpTeW1j2JlvQ%3D%3D", True)
+        ("/VzMNpuL7TfpTeW1j2JlvQ%3D%3D", True)
     ]
 
     #  =========================================
