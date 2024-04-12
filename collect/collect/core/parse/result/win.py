@@ -11,55 +11,36 @@ from contant import constants
 logger = logging.getLogger(__name__)
 
 
-@stats.function_stats(logger)
-def parse_win_bid(parts: list[list[str]]) -> dict:
+@stats.function_stats(logger, log_params=True)
+def parse_win_bid(parts: dict[int, list[str]]) -> dict:
     """
     解析 中标结果
     :param parts:
-    :return: 如果结果公告匹配，那么返回对应的数据；否则返回 None
+    :return: 返回包含 `KEY_PROJECT_BID_ITEMS`、 `KEY_PROJECT_REVIEW_EXPERT` 和 `KEY_PROJECT_PURCHASE_REPRESENTOR` 的数据
     """
 
-    def is_bids_information(title: str) -> bool:
-        return "中标（成交）信息" == title
-
-    def is_review_expert(title: str) -> bool:
-        return "评审" in title
-
-    def parse_bids_information(
-        _part: list[str], parser: Type[AbstractFormatParser]
-    ) -> list:
-        """
-        解析中标信息
-        :param parser:
-        :param _part:
-        :return:
-        """
-        return parser.parse_bids_information(part=_part)
-
-    def parse_review_expert(
-        _part: list[str], parser: Type[AbstractFormatParser]
-    ) -> dict:
-        """
-        解析评审专家信息
-        :param parser:
-        :param _part:
-        :return:
-        """
-        return parser.parse_review_expert(part=_part)
-
     data = dict()
+    bid_items = []
+    data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
 
-    for part in parts:
-        if is_bids_information(title=part[0]):
-            # 解析 标项信息
-            bid_items = parse_bids_information(
-                _part=part, parser=WinBidStandardFormatParser
+    # 解析 标项信息
+    if constants.KEY_PART_WIN_BID in parts:
+        bid_items.extend(
+            WinBidStandardFormatParser.parse_bids_information(
+                part=parts[constants.KEY_PART_WIN_BID]
             )
-            data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
-        elif is_review_expert(title=part[0]):
-            data.update(
-                parse_review_expert(_part=part, parser=WinBidStandardFormatParser)
+        )
+    # 解析 评审专家信息
+    if constants.KEY_PART_REVIEW_EXPERT in parts:
+        data.update(
+            WinBidStandardFormatParser.parse_review_expert(
+                part=parts[constants.KEY_PART_REVIEW_EXPERT]
             )
+        )
+    # 解析 联系方式信息
+    if constants.KEY_PART_CONTACT in parts:
+        data.update(common.parse_contact_info(part=parts[constants.KEY_PART_CONTACT]))
+
     return data
 
 
@@ -85,7 +66,6 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             text = part[idx]
             # 当前是序号
             if is_bid_item_index(text):
-                bid_item = dict()
                 # 中标金额
                 price_text = part[idx + 1]
                 # 中标供应商
@@ -96,8 +76,8 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 while idx < n and not is_bid_item_index(part[idx]):
                     idx += 1
                 address_text = "".join(part[pre:idx])
-                bid_item[constants.KEY_BID_ITEM_INDEX] = int(text)
-                bid_item[constants.KEY_BID_ITEM_NAME] = None
+                # 标项信息
+                bid_item = common.get_template_bid_item(is_win=True, index=int(text))
                 amount, is_percent = AbstractFormatParser.parse_win_bid_item_amount(
                     string=price_text
                 )
@@ -179,7 +159,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 and (s.endswith("：") or s.endswith(":"))
             )
 
-        data, idx, n = [], 1, len(part)
+        data, idx, n = [], 0, len(part)
         while idx < n:
             text = part[idx]
             # 判断标题为 “1.中标结果”
@@ -192,11 +172,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 )
             # 判断标题为 “2.废标结果”
             elif is_not_win_bid_result(text):
-                res = WinBidStandardFormatParser._parse_not_win_bids(
-                    part=part[idx + 1 :]
+                data.extend(
+                    WinBidStandardFormatParser._parse_not_win_bids(part=part[idx + 1 :])
                 )
-                if len(res) > 0:
-                    data.extend(res)
                 idx += 1
             else:
                 idx += 1

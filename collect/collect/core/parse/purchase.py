@@ -1,12 +1,11 @@
 import json
 import logging
-import time
-from typing import Type
+from typing import Union
 
 from collect.collect.core.parse import common, AbstractFormatParser
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import log, symbol_tools as sym, debug_stats as stats
+from collect.collect.utils import symbol_tools as sym, debug_stats as stats
 from contant import constants
 
 logger = logging.getLogger(__name__)
@@ -120,74 +119,18 @@ class StandardFormatParser(AbstractFormatParser):
     @staticmethod
     @stats.function_stats(logger)
     def parse_project_contact(part: list[str]) -> dict:
-        """
-        解析 以下方式联系 部分
-        :param part:
-        :return:
-        """
+        return common.parse_contact_info(part)
 
-        def check_information_begin(s: str) -> bool:
-            return common.startswith_number_index(s) >= 1
 
-        def check_name(s: str) -> bool:
-            startswith_name = s.startswith("名") or (s.find("名") < s.find("称"))
-            endswith_colon = s.endswith(":") or s.endswith("：")
-            return startswith_name and endswith_colon
-
-        def check_address(s: str) -> bool:
-            startswith_address = s.startswith("地") or (s.find("地") < s.find("址"))
-            endswith_colon = s.endswith(":") or s.endswith("：")
-            return startswith_address and endswith_colon
-
-        def check_person(s: str) -> bool:
-            startswith_person = s.startswith("项目联系人") or s.startswith("联系人")
-            endswith_colon = s.endswith(":") or s.endswith("：")
-            return startswith_person and endswith_colon
-
-        def check_contact_method(s: str) -> bool:
-            startswith_contact_method = s.startswith("项目联系方式") or s.startswith(
-                "联系方式"
-            )
-            endswith_colon = s.endswith(":") or s.endswith("：")
-            return startswith_contact_method and endswith_colon
-
-        data, n, idx = dict(), len(part), 0
-        while idx < n:
-            text = part[idx]
-            if check_information_begin(text):
-                # 采购人 / 采购代理机构信息
-                key_word = text[2:]
-                idx += 1
-                info = dict()
-                # 开始解析内容
-                while idx < n and not check_information_begin(part[idx]):
-                    # 名称
-                    if check_name(part[idx]):
-                        info["name"] = part[idx + 1]
-                        idx += 2
-                    # 地址
-                    elif check_address(part[idx]):
-                        info["address"] = part[idx + 1]
-                        idx += 2
-                    # 联系人
-                    elif check_person(part[idx]):
-                        info["person"] = part[idx + 1].split("、")
-                        idx += 2
-                    # 联系方式
-                    elif check_contact_method(part[idx]):
-                        info["contact_method"] = part[idx + 1]
-                        idx += 2
-                    else:
-                        idx += 1
-
-                # 加入到 data 中
-                if key_word.startswith("采购人"):
-                    data[constants.KEY_PURCHASER_INFORMATION] = info
-                elif key_word.startswith("采购代理机构"):
-                    data[constants.KEY_PURCHASER_AGENCY_INFORMATION] = info
-            else:
-                idx += 1
-        return data
+def check_useful_part(title: str) -> Union[int, None]:
+    """
+    检查是否包含有用信息的标题
+    :param title:
+    :return:
+    """
+    if "项目基本情况" in title:
+        return constants.KEY_PART_PROJECT_SITUATION
+    return None
 
 
 @stats.function_stats(logger)
@@ -199,37 +142,32 @@ def parse_html(html_content: str):
     """
     result = common.parse_html(html_content=html_content)
 
-    def check_useful_part(title: str) -> bool:
-        """
-        检查是否包含有用信息的标题
-        :param title:
-        :return:
-        """
-        return ("项目基本情况" == title) or ("以下方式联系" in title)
+    parts = dict[int, list[str]]()
+    n, idx, chinese_idx = len(result), 0, 0
 
-    n, idx, parts = len(result), 0, []
-    # 将 result 划分为 若干个部分，每部分的第一个字符串是标题
+    # 将 result 划分为 若干个部分
     try:
         while idx < n:
             # 找以 “一、” 这种格式开头的字符串
             index = common.startswith_chinese_number(result[idx])
-            if index != -1:
-                result[idx] = result[idx][
-                    result[idx].index("、") + 1 :
-                ]  # 去掉前面的序号
-                if not check_useful_part(title=result[idx]):
-                    continue
-                pre = idx  # 开始部分
-                idx += 1
-                # 以 "<中文数字>、“ 形式划分区域
-                # 部分可能带有上面的格式，但是最后面带有冒号：
-                while idx < n and (
-                    common.startswith_chinese_number(result[idx]) == -1
-                    or sym.endswith_colon_symbol(result[idx])
-                ):
+            if index > chinese_idx:
+                key_part = check_useful_part(title=result[idx])
+                if key_part:
+                    chinese_idx = index
+                    # 开始部分（不算入标题）
                     idx += 1
-                # 将该部分加入
-                parts.append(result[pre:idx])
+                    pre = idx
+                    # 以 "<中文数字>、“ 形式划分区域
+                    # 部分可能带有上面的格式，但是最后面带有冒号：
+                    while idx < n and (
+                        common.startswith_chinese_number(result[idx]) == -1
+                        or sym.endswith_colon_symbol(result[idx])
+                    ):
+                        idx += 1
+                    # 将该部分加入
+                    parts[key_part] = result[pre:idx]
+                else:
+                    idx += 1
             else:
                 idx += 1
     except BaseException as e:
@@ -237,40 +175,38 @@ def parse_html(html_content: str):
 
     parts_length = len(parts)
     try:
-        if parts_length >= 2:
-            return _parse(parts, parser=StandardFormatParser)
+        if parts_length >= 1:
+            return _parse(parts)
         else:
             raise ParseError(
-                msg="解析 parts 出现未完善情况",
-                content=["\n".join(part) for part in parts],
+                msg="解析 parts 出现不足情况",
+                content=result,
             )
     except BaseException as e:
-        raise_error(error=e, msg="解析 __parse_standard_format 失败", content=parts)
+        raise_error(
+            error=e,
+            msg="解析 __parse_standard_format 失败",
+            content=["\n".join(v) for _, v in parts],
+        )
 
 
 @stats.function_stats(logger)
-def _parse(parts: list[list[str]], parser: Type[AbstractFormatParser]):
+def _parse(parts: dict[int, list[str]]):
     """
     解析 parts 部分
     :param parts:
-    :param parser:
     :return:
     """
 
-    # 通过标题来判断是哪个部分
-    def is_project_base_situation(s):
-        return s == "项目基本情况"
-
-    def is_project_contact(s):
-        return "以下方式联系" in s
-
     data = dict()
-    for part in parts:
-        title = part[0]
-        if is_project_base_situation(title):
-            data.update(parser.parse_project_base_situation(part))
-        elif is_project_contact(title):
-            data.update(parser.parse_project_contact(part))
+    # 项目基本情况
+    if constants.KEY_PART_PROJECT_SITUATION in parts:
+        data.update(
+            StandardFormatParser.parse_project_base_situation(
+                parts[constants.KEY_PART_PROJECT_SITUATION]
+            )
+        )
+
     return data
 
 

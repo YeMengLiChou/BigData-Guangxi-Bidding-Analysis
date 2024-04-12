@@ -13,3 +13,4 @@ key="an"
 
 [debug]
 enable = true
+#enable = false

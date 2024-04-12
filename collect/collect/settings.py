@@ -45,7 +45,7 @@ SPIDER_MIDDLEWARES = {
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    "collect.middlewares.AnnouncementFilterMiddleware": 12,
+    "collect.middlewares.ArticleIdFilterDownloadMiddleware": 12,
     "collect.middlewares.UserAgentMiddleware": 100,
     "collect.middlewares.ResponseDebugMiddleware": 100,
     "scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware": 500,

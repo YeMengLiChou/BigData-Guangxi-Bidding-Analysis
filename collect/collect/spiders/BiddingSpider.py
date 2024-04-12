@@ -1,24 +1,22 @@
 import json
 import logging
 import urllib.parse
-from typing import Union, Any
-
-from scrapy import signals
-from typing_extensions import Self
+from typing import Any
 
 import scrapy
+from scrapy import signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
+from typing_extensions import Self
 
 from collect.collect.core.api.category import CategoryApi
 from collect.collect.core.api.detail import DetailApi
-from collect.collect.core.parse import result, purchase
+from collect.collect.core.parse import result, purchase, common
 from collect.collect.core.parse.result import SwitchError
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import (
     redis_tools as redis,
     time as time_tools,
-    log,
     debug_stats as stats,
 )
 from contant import constants
@@ -26,9 +24,9 @@ from contant import constants
 logger = logging.getLogger(__name__)
 
 
-@stats.function_stats(logger, log_params=True)
+@stats.function_stats(logger)
 def _make_result_request(
-        pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
+    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
 ):
     """
     生成结果列表的请求
@@ -41,7 +39,8 @@ def _make_result_request(
     # TODO: 根据redis中的缓存数据进行获取, redis 应该记录数据库中最新的数据
     publish_date_begin = redis.get_latest_announcement_timestamp() or "2020-01-01"
     publish_date_end = redis.parse_timestamp(timestamp=time_tools.now_timestamp())
-
+    # logging.info(f"redis lasting info: publish_date_begin: {publish_date_begin}, publish_date_end: {
+    # publish_date_end}")
     return scrapy.Request(
         url=CategoryApi.base_url,
         callback=callback,
@@ -51,7 +50,7 @@ def _make_result_request(
             pageSize=pageSize,
             categoryCode="ZcyAnnouncement2",
             publishDateBegin="2022-01-01",
-            publishDateEnd="2022-01-04",
+            publishDateEnd="2022-01-02",
         ),
         headers={"Content-Type": "application/json;charset=UTF-8"},
         dont_filter=dont_filter,
@@ -72,172 +71,94 @@ def _make_detail_request(articleId: str, callback: callable, meta: dict):
         callback=callback,
         method=DetailApi.method,
         meta=meta,
-        dont_filter=True
+        dont_filter=True,
     )
 
 
 @stats.function_stats(logger)
 def _parse_other_announcements(other_announcements: list, meta: dict):
     """
-    解析 announcementLinkDtoList 中的信息，得到采购公告的 articleId
+    解析 announcementLinkDtoList 中的信息，用于保证其他情况的出现时先前的不会漏
     :param other_announcements:
     :return:
     """
     if not other_announcements:
-        return None
+        return
 
-    if meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None):
-        return meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+    # 如果已经解析过了，则无需解析，（存在于前一个结果公告不能解析，切换到下一个解析）
+    # 第一次解析时，类型为 str；经过解析后的类型为 list
+    if isinstance(meta.get(constants.KEY_PROJECT_RESULT_ARTICLE_ID, None), list):
+        return
 
-    # 过滤出存在且非当前结果公告的公告信息
-    exist_other_announcements = sorted(
-        [
-            item
-            for item in other_announcements
-            if item.get("isExist", False) and (not item.get("isCurrent", False))
-        ],
-        key=lambda item: item["order"],
-        reverse=True,
-    )
-    # 找出 采购公告
-    for item in exist_other_announcements:
-        if item["typeName"] == "采购公告":
-            return item["articleId"]
+    # 所有结果公告
+    result_article_ids, result_publish_dates = [], []
+    # 所有采购公告
+    purchase_article_ids, purchase_publish_dates = [], []
+    # 所有其他公告（采购公告备选）
+    other_ids, other_publish_dates = [], []
 
-    # 也有可能是 “其他公告”
-    for item in exist_other_announcements:
-        if item["typeName"] == "其他公告":
-            return item["articleId"]
+    # 计算招标持续时间（最后的合同公告时间 - 最开始的招标时间）
+    min_publish_date, max_publish_date = time_tools.now_timestamp(), -1
 
-    # 存在没有 “采购公告” 的情况
-    logger.warning(
-        f"解析其他公告时未发现采购公告相关信息: other_announcements: {other_announcements}"
-    )
-    return None
+    other_announcements.sort(key=lambda x: x["order"])
 
+    for item in other_announcements:
+        if not item["isExist"]:
+            continue
 
-@stats.function_stats(logger)
-def _merge_bid_items(_purchase: list, _result: list) -> list:
-    """
-    将两部分的标项信息合并
-    :param _purchase:
-    :param _result:
-    :return:
-    """
-    # TODO: 可能部分标项信息的index不一致，需要其他方法来进行实现
-    _purchase.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
-    _result.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
+        # 统计时间
+        publish_date = item["publishDateTime"]
+        min_publish_date = min(min_publish_date, publish_date)
+        max_publish_date = max(max_publish_date, publish_date)
 
-    n, m = len(_purchase), len(_result)
-    if n != m:
-        raise ParseError(
-            msg="标项数量不一致",
-            content=[f"purchase length: {n}, result length: {m}", _purchase, _result],
-        )
+        type_name = item["typeName"]
+        # 采购公告
+        if "采购" in type_name:
+            purchase_article_ids.append(item["articleId"])
+            purchase_publish_dates.append(publish_date)
+        # 结果公告
+        elif "结果" in type_name:
+            result_article_ids.append(item["articleId"])
+            result_publish_dates.append(publish_date)
+        # 其他公告
+        elif "其他" in type_name:
+            other_ids.append(item["articleId"])
+            other_publish_dates.append(publish_date)
 
-    for idx in range(n):
-        purchase_item = _purchase[idx]
-        result_item = _result[idx]
-        # 标项名称不一致
-        if (result_item.get(constants.KEY_BID_ITEM_NAME, None)
-                and purchase_item[constants.KEY_BID_ITEM_NAME] != result_item[constants.KEY_BID_ITEM_NAME]
-        ):
-            raise ParseError(
-                msg="标项名称不一致",
-                content=[
-                    f"purchase item: {purchase_item}, result item: {result_item}"
-                ],
+    # 如果没有采购公告，则使用其他公告
+    if len(purchase_article_ids) == 0:
+        if len(other_ids) != 0:
+            purchase_article_ids.extend(other_ids)
+            purchase_publish_dates.extend(other_publish_dates)
+        else:
+            # 存在没有 “采购公告” 的情况
+            logger.warning(
+                f"解析其他公告时未发现采购公告相关信息: other_announcements: {other_announcements}"
             )
 
-        result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
-            constants.KEY_BID_ITEM_NAME
-        ]
-        result_item[constants.KEY_BID_ITEM_QUANTITY] = purchase_item[
-            constants.KEY_BID_ITEM_QUANTITY
-        ]
-        result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[
-            constants.KEY_BID_ITEM_BUDGET
-        ]
-    return _result
+    current_result_id = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
 
+    meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID] = result_article_ids
+    meta[constants.KEY_PROJECT_RESULT_PUBLISH_DATE] = result_publish_dates
 
-@stats.function_stats(logger)
-def make_item(data: dict, purchase_data: Union[dict, None]):
-    """
-    将 data 所需要的内容提取出来
-    :param purchase_data:
-    :param data:
-    :return:
-    """
-    if purchase_data:
-        # 合并标项
-        purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
-        result_bid_items = data.get(constants.KEY_PROJECT_BID_ITEMS, [])
-        data[constants.KEY_PROJECT_BID_ITEMS] = _merge_bid_items(
-            _purchase=purchase_bid_items, _result=result_bid_items
+    meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = purchase_article_ids
+    meta[constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE] = purchase_publish_dates
+
+    # 前一个结果公告
+    meta[constants.KEY_DEV_PRE_RESULT_ARTICLE_ID] = current_result_id
+
+    # 计算招标持续时间
+    if max_publish_date - min_publish_date <= 0:
+        raise ParseError(
+            msg=f"解析 other_announcement 时出现异常, duration计算为 {max_publish_date - min_publish_date}",
+            content=other_announcements.extend(
+                [
+                    f"min_publish_date: {min_publish_date}",
+                    f"max_publish_date: {max_publish_date}",
+                ]
+            ),
         )
-        # 项目编号和名称，以 api 返回为准，如果没有则用解析出来的补充
-        project_name = purchase_data.pop(constants.KEY_PROJECT_NAME, None)
-        project_code = purchase_data.pop(constants.KEY_PROJECT_CODE, None)
-        if not data.get(constants.KEY_PROJECT_NAME, None):
-            data[constants.KEY_PROJECT_NAME] = project_name
-        if not data.get(constants.KEY_PROJECT_CODE, None):
-            data[constants.KEY_PROJECT_CODE] = project_code
-
-        # 其他内容信息直接合并
-        data.update(purchase_data)
-
-    # 从 data 中取出所需要的信息
-    item = dict()
-    item[constants.KEY_PROJECT_NAME] = data.get(constants.KEY_PROJECT_NAME, None)
-    item[constants.KEY_PROJECT_CODE] = data.get(constants.KEY_PROJECT_CODE, None)
-    item[constants.KEY_PROJECT_DISTRICT_NAME] = data.get(
-        constants.KEY_PROJECT_DISTRICT_NAME, None
-    )
-    item[constants.KEY_PROJECT_DISTRICT_CODE] = data.get(
-        constants.KEY_PROJECT_DISTRICT_CODE, None
-    )
-    item[constants.KEY_PROJECT_CATALOG] = data.get(constants.KEY_PROJECT_CATALOG, None)
-    item[constants.KEY_PROJECT_PROCUREMENT_METHOD] = data.get(
-        constants.KEY_PROJECT_PROCUREMENT_METHOD, None
-    )
-    item[constants.KEY_PROJECT_BID_OPENING_TIME] = data.get(
-        constants.KEY_PROJECT_BID_OPENING_TIME, None
-    )
-    item[constants.KEY_PROJECT_IS_WIN_BID] = data.get(
-        constants.KEY_PROJECT_IS_WIN_BID, None
-    )
-    item[constants.KEY_PROJECT_RESULT_ARTICLE_ID] = data.get(
-        constants.KEY_PROJECT_RESULT_ARTICLE_ID, None
-    )
-    item[constants.KEY_PROJECT_RESULT_PUBLISH_DATE] = data.get(
-        constants.KEY_PROJECT_RESULT_PUBLISH_DATE, None
-    )
-    item[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data.get(
-        constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE, None
-    )
-    item[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = data.get(
-        constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None
-    )
-    item[constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE] = data.get(
-        constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE, None
-    )
-    item[constants.KEY_PROJECT_TOTAL_BUDGET] = data.get(
-        constants.KEY_PROJECT_TOTAL_BUDGET, None
-    )
-    item[constants.KEY_PROJECT_BID_ITEMS] = data.get(
-        constants.KEY_PROJECT_BID_ITEMS, None
-    )
-    item[constants.KEY_PURCHASER_INFORMATION] = data.get(
-        constants.KEY_PURCHASER_INFORMATION, None
-    )
-    item[constants.KEY_PURCHASER_AGENCY_INFORMATION] = data.get(
-        constants.KEY_PURCHASER_AGENCY_INFORMATION, None
-    )
-    item[constants.KEY_PROJECT_REVIEW_EXPERT] = data.get(
-        constants.KEY_PROJECT_REVIEW_EXPERT, []
-    )
-    return item
+    meta[constants.KEY_PROJECT_TENDER_DURATION] = max_publish_date - min_publish_date
 
 
 class BiddingSpider(scrapy.Spider):
@@ -254,9 +175,11 @@ class BiddingSpider(scrapy.Spider):
         stats.log_stats_collector()
 
     # ========== use for debug ================
+
     special_article_ids = [
         # template: ("article_id", is_win: bool)
-        ("/VzMNpuL7TfpTeW1j2JlvQ%3D%3D", True)
+        # ("U4nmS6%2BttFXSjN5otQ77OA%3D%3D", True)  # 存在多个采购公告和结果公告的
+        ("4ove6DOhBSozWjPJ3AxxUg==", False)
     ]
 
     #  =========================================
@@ -268,19 +191,27 @@ class BiddingSpider(scrapy.Spider):
         """
         if len(self.special_article_ids) > 0:
             # 调试有问题的 article_id
-            logger.warning(f"Start Special Requests, total {len(self.special_article_ids)}")
+            logger.warning(
+                f"Start Special Requests, total {len(self.special_article_ids)}"
+            )
             for article_id, is_win in self.special_article_ids:
                 logger.warning(f"Special Article: {article_id}")
                 yield _make_detail_request(
                     articleId=urllib.parse.unquote(article_id),
                     callback=self.parse_result_detail_content,
                     meta={
-                        constants.KEY_PROJECT_IS_WIN_BID: is_win
+                        constants.KEY_PROJECT_RESULT_ARTICLE_ID: urllib.parse.unquote(
+                            article_id
+                        ),
+                        constants.KEY_PROJECT_IS_WIN_BID: is_win,
                     },
                 )
         else:
             yield _make_result_request(
-                pageNo=1, pageSize=1, callback=self.parse_result_amount, dont_filter=True
+                pageNo=1,
+                pageSize=1,
+                callback=self.parse_result_amount,
+                dont_filter=True,
             )
 
     @stats.function_stats(logger)
@@ -297,7 +228,10 @@ class BiddingSpider(scrapy.Spider):
             self.logger.debug(f"initial fetch amount: {total}")
             for i in range(1, total // 100 + 2):
                 yield _make_result_request(
-                    pageNo=i, pageSize=100, callback=self.parse_result_data, dont_filter=True
+                    pageNo=i,
+                    pageSize=100,
+                    callback=self.parse_result_data,
+                    dont_filter=True,
                 )
         else:
             # TODO: 加入 retry 功能
@@ -338,87 +272,90 @@ class BiddingSpider(scrapy.Spider):
             meta: dict = response.meta
             data: dict = response_body["result"]["data"]
 
-            meta[constants.KEY_PROJECT_CODE] = data["projectCode"]
-            meta[constants.KEY_PROJECT_NAME] = data["projectName"]
-            meta[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data["isGovPurchase"]
-            meta[constants.KEY_PROJECT_RESULT_PUBLISH_DATE] = data["publishDate"]
-
             # 解析 html 结果
             try:
-                meta.update(
-                    result.parse_html(
-                        html_content=data["content"],
-                        is_wid_bid=meta[constants.KEY_PROJECT_IS_WIN_BID],
+                if data:
+                    meta[constants.KEY_PROJECT_CODE] = data["projectCode"]
+                    meta[constants.KEY_PROJECT_NAME] = data["projectName"]
+                    meta[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data[
+                        "isGovPurchase"
+                    ]
+
+                    # 解析其他公告
+                    _parse_other_announcements(
+                        other_announcements=data["announcementLinkDtoList"], meta=meta
                     )
-                )
+
+                    meta.update(
+                        result.parse_html(
+                            html_content=data["content"],
+                            is_win_bid=meta[constants.KEY_PROJECT_IS_WIN_BID],
+                        )
+                    )
+                else:
+                    raise SwitchError("该结果公告没有任何返回数据")
             except SwitchError:
                 # 当前结果公告不好使，换一个
-                if stats.debug_status():
-                    logger.debug(
-                        f"DEBUG INFO: {log.get_function_name()} switch other result announcement"
-                    )
-                yield self.switch_other_result_announcement(
-                    other_announcements=data["announcementLinkDtoList"], meta=meta
-                )
+                yield self.switch_other_result_announcement(meta=meta)
                 return
-
-            # 解析其他公告的结果
-            purchase_article_id = _parse_other_announcements(
-                other_announcements=data["announcementLinkDtoList"],
-                meta=meta
-            )
-
-            # 存在 “采购公告”
-            if purchase_article_id:
-                yield _make_detail_request(
-                    articleId=purchase_article_id,
-                    callback=self.parse_purchase,
-                    meta=meta,
-                )
             else:
-                # 没有 “采购公告”，直接进入 make_item 生成 item
-                yield make_item(data=meta, purchase_data=None)
+                # 没有出现 SwitchError 则解析采购公告
+                purchase_article_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+                if len(purchase_article_ids) == 0:
+                    # 没有 “采购公告”，直接进入 make_item 生成 item
+                    yield common.make_item(data=meta, purchase_data=None)
+                else:
+                    # 存在 “采购公告”
+                    yield _make_detail_request(
+                        articleId=purchase_article_ids[0],
+                        callback=self.parse_purchase,
+                        meta=meta,
+                    )
         else:
             # TODO: 加入 retry 功能
             self.logger.error(f"result response not success: {response.text}")
 
-    @stats.function_stats(logger)
-    def switch_other_result_announcement(self, other_announcements, meta: dict):
+    @stats.function_stats(logger, log_params=True)
+    def switch_other_result_announcement(self, meta: dict):
         """
         切换其他结果公告
         :param meta:
-        :param other_announcements:
         :return:
         """
-        # 拿到 结果公告 和 采购公告（部分情况存在结果公告有采购，但是切换之后没有采购公告）
-        result_article_id, result_order = None, -1
-        purchase_article_id, purchase_order = None, -1
+        # 已经解析的列表
+        result_ids = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
+        if not isinstance(result_ids, list):
+            raise ParseError(
+                msg="switch_other_announcement 存在异常，未解析 result_ids 为 list",
+                content=[result_ids],
+            )
+        # 前一个公告id
+        pre_result_id = meta[constants.KEY_DEV_PRE_RESULT_ARTICLE_ID]
+        next_result_id = None
 
-        for item in other_announcements:
-            if item['isCurrent'] or (not item['isExist']):
-                continue
+        for idx in range(1, len(result_ids)):
+            if result_ids[idx - 1] == pre_result_id:
+                next_result_id = result_ids[idx]
 
-            if item['typeName'] in ('结果公告', "成交公告", "终止公告") and item['order'] > result_order:
-                result_article_id, result_order = item['articleId'], item['order']
-                continue
-
-            if item['typeName'] in ('采购公告', '采购结果') and item['order'] > purchase_order:
-                purchase_article_id, purchase_order = item['articleId'], item['order']
-
-        if result_article_id:
-            logger.warning(f"已经切换到 {result_article_id} 结果公告进行爬取")
-            meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = purchase_article_id
+        if next_result_id:
+            # 切换到下一个结果公告
+            logger.warning(f"已经切换到 {next_result_id} 结果公告进行爬取")
+            meta[constants.KEY_DEV_PRE_RESULT_ARTICLE_ID] = next_result_id
             return _make_detail_request(
-                articleId=result_article_id,
+                articleId=next_result_id,
                 callback=self.parse_result_detail_content,
                 meta=meta,
             )
-        raise ParseError(msg="不存在其他的结果公告可以解析")
+        else:
+            raise ParseError(
+                msg="不存在其他的结果公告可以解析",
+                content=[f"pre_article_id: {pre_result_id}"].extend(result_ids),
+            )
 
     @stats.function_stats(logger)
     def parse_purchase(self, response: Response):
         """
-        解析采购公告，最后的步骤
+        5. 解析采购公告，最后的步骤
         :param response:
         :return:
         """
@@ -426,19 +363,16 @@ class BiddingSpider(scrapy.Spider):
         if response_body.get("success", False):
             data = response_body["result"]["data"]
             meta = response.meta
-            # 采购公告id
-            meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = data["articleId"]
-            meta[constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE] = data["publishDate"]
 
+            # TODO: 可能存在多个采购公告，考虑 SwitchError
             # 更新 html 内容
             purchase_data = purchase.parse_html(html_content=data["content"])
 
-            # TODO: 处理标项等信息百分比
-            yield make_item(meta, purchase_data)
+            yield common.make_item(meta, purchase_data)
         else:
             # TODO: 加入 retry 功能
             self.logger.error(f"purchase response not success: {response.text}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("请启动 main-collecting.py 文件，而不是本文件！")

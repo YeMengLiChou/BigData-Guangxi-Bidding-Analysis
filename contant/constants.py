@@ -25,6 +25,46 @@ BID_ITEM_AMOUNT_NOT_DEAL = -1
 标项-金额没有成交，即废标
 """
 
+BID_ITEM_AMOUNT_UNASSIGNED = -2
+"""
+标项-金额还没被赋值（初始化ing）
+"""
+
+BID_ITEM_BUDGET_UNASSIGNED = -1
+"""
+标项-预算还未赋值（初始化ing）
+"""
+
+BID_ITEM_REASON_UNKNOWN = -2
+"""
+标项-废标理由：未知
+"""
+
+BID_ITEM_REASON_UNASSIGNED = -1
+"""
+标项-废标理由：还未赋值
+"""
+
+BID_ITEM_REASON_NOT_EXIST = 0
+"""
+标项-废标理由不存在，也就是中标了
+"""
+
+BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS = 1
+"""
+标项-废标理由：供应商不足
+"""
+
+PROJECT_AMOUNT_UNASSIGNED = -1
+"""
+项目的总金额-未赋值
+"""
+
+PROJECT_AMOUNT_FAILED = 0
+"""
+项目的总金额：废标/终止
+"""
+
 # ===================== Scrapy Item Key =====================
 
 KEY_PROJECT_NAME = "project_name"
@@ -42,6 +82,11 @@ KEY_PROJECT_TOTAL_BUDGET = "total_budget"
 项目-总预算金额
 """
 
+KEY_PROJECT_TOTAL_AMOUNT = "total_amount"
+"""
+项目-总中标金额
+"""
+
 KEY_PROJECT_BID_ITEMS = "bid_items"
 """
 项目-所有标项
@@ -49,7 +94,7 @@ KEY_PROJECT_BID_ITEMS = "bid_items"
 
 KEY_PROJECT_IS_GOVERNMENT_PURCHASE = "is_government_purchase"
 """
-项目-是否为项目采购
+项目-是否为项目采购 
 """
 
 KEY_PROJECT_DISTRICT_CODE = "district_code"
@@ -59,7 +104,7 @@ KEY_PROJECT_DISTRICT_CODE = "district_code"
 
 KEY_PROJECT_DISTRICT_NAME = "district_name"
 """
-项目-项目所在行政区划名称
+项目-项目所在行政区划名称 (x)
 """
 
 KEY_PROJECT_CATALOG = "catalog"
@@ -107,6 +152,11 @@ KEY_PROJECT_PURCHASE_PUBLISH_DATE = "purchase_publish_date"
 项目-采购公告发布日期
 """
 
+KEY_PROJECT_TENDER_DURATION = "tender_duration"
+"""
+项目-持续时间：从最开始的公告发布开始（一般是意见或采购），到最后的公告结束（一般是合同）
+"""
+
 KEY_PROJECT_PURCHASE_REPRESENTOR = "purchase_representor"
 """
 项目-采购代表人
@@ -126,7 +176,6 @@ KEY_PROJECT_TERMINATION_REASON = "termination_reason"
 """
 项目-终止原因
 """
-
 
 KEY_PURCHASER_INFORMATION = "purchaser_information"
 """
@@ -196,4 +245,52 @@ KEY_BID_ITEM_IS_PERCENT = "is_percent"
 KEY_BID_ITEM_REASON = "reason"
 """
 标项-废标原因
+"""
+
+# =========================== dev key =====================
+
+KEY_DEV_PRE_RESULT_ARTICLE_ID = "pre_result_article_id"
+"""
+前一个结果公告id
+"""
+
+# ========================= part key =====================
+KEY_PART_PROJECT_CODE = 0
+"""
+表示项目编号的part
+"""
+
+KEY_PART_PROJECT_NAME = 1
+"""
+表示项目名称的part
+"""
+
+KEY_PART_TERMINATION_REASON = 2
+"""
+表示终止原因的part
+"""
+
+KEY_PART_WIN_BID = 3
+"""
+表示中标信息的part
+"""
+
+KEY_PART_NOT_WIN_BID = 4
+"""
+表示未中标信息的part
+"""
+
+KEY_PART_CONTACT = 5
+"""
+代表联系方式的part
+"""
+
+KEY_PART_REVIEW_EXPERT = 6
+"""
+代表评审专家的part
+"""
+
+KEY_PART_PROJECT_SITUATION = 7
+"""
+表示项目基本情况的part
 """
