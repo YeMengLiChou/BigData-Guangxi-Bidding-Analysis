@@ -54,8 +54,6 @@ def parse_response_data(data: list):
             constants.KEY_PROJECT_AUTHOR: item["author"],
             # 地区编号（可能为空）
             constants.KEY_PROJECT_DISTRICT_CODE: item["districtCode"],
-            # 地区名称（可能为空）
-            constants.KEY_PROJECT_DISTRICT_NAME: item["districtName"],
             # 采购物品名称
             constants.KEY_PROJECT_CATALOG: item["gpCatalogName"],
             # 采购方式
@@ -138,7 +136,6 @@ def parse_html(html_content: str, is_win_bid: bool):
             index = common.startswith_chinese_number(result[idx])
             if index > chinese_number_index:
                 key_part = check_useful_part(is_win=is_win_bid, title=result[idx])
-                print(key_part, result[idx])
                 # 该部分为所需要的标题信息
                 if key_part:
                     chinese_number_index = index

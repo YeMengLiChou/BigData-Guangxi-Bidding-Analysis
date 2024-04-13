@@ -92,15 +92,20 @@ def startswith_chinese_number(text: str) -> int:
 
 def startswith_number_index(text: str) -> int:
     """
-    判断text是否为 “数字.” 开头
+    判断text是否为 “数字.” 或 “数字、”开头
     :param text:
     :return:
     """
     if len(text) == 0:
         return -1
-    idx = text.find(".")
-    if (idx == -1) or (not text[0].isdigit()):
+    if not text[0].isdigit():
         return -1
+
+    idx = text.find(".")
+    if idx == -1:
+        idx = text.find("、")
+    if idx == -1:
+        return idx
     try:
         value = int(text[:idx])
     except ValueError:
@@ -117,11 +122,8 @@ def parse_review_experts(part: list[str]) -> dict:
     """
     data = dict()
     # 拿到后面部分的内容
-    dist = part[-1].replace("评审专家名单：", "")  # 部分带有该前缀
-    # 拿到分隔符
-    split_symbol = sym.get_symbol(dist, [",", "，", "、"])
-    # 分隔
-    persons = dist.split(split_symbol)
+    dist = "".join(part).replace("评审专家名单：", "")  # 部分带有该前缀
+
     # 评审小组
     review_experts = []
     data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
@@ -129,6 +131,13 @@ def parse_review_experts(part: list[str]) -> dict:
     representors = []
     data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representors
 
+    if dist == "/":
+        return data
+
+    # 拿到分隔符
+    split_symbol = sym.get_symbol(dist, [",", "，", "、"])
+    # 分隔
+    persons = dist.split(split_symbol)
     for p in persons:
         # 部分去掉句号
         p = p.replace("。", "")
@@ -201,7 +210,9 @@ def get_template_bid_item(is_win: bool, index: int) -> dict:
 
 @stats.function_stats(logger)
 def parse_bid_item_reason(reason: str) -> int:
-    if "有效供应商不足三家" in reason:
+    # 1.有效供应商(不足三家)
+    # 2.提交投标文件的投标供应商数量(不足三家),本项目废标
+    if "不足三家" in reason and "供应商" in reason:
         return constants.BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
@@ -290,36 +301,57 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
     _purchase.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
     _result.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
 
-    n, m = len(_purchase), len(_result)
+    n = len(_purchase)
+    if len(_result) == 0:
+        m = 0
+    else:
+        # 存在多个供应商分一个标项
+        m = max(_result, key=lambda x: x[constants.KEY_BID_ITEM_INDEX])[
+            constants.KEY_BID_ITEM_INDEX
+        ]
     if n != m:
         raise ParseError(
             msg="标项数量不一致",
             content=[f"purchase length: {n}, result length: {m}", _purchase, _result],
         )
 
-    for idx in range(n):
-        purchase_item = _purchase[idx]
-        result_item = _result[idx]
-        # 标项名称不一致
-        if (
-            result_item.get(constants.KEY_BID_ITEM_NAME, None)
-            and purchase_item[constants.KEY_BID_ITEM_NAME]
-            != result_item[constants.KEY_BID_ITEM_NAME]
+    result_len = len(_result)
+    r_idx = 0
+    for p_idx in range(n):
+        purchase_item = _purchase[p_idx]
+        purchase_index = purchase_item[constants.KEY_BID_ITEM_INDEX]
+        # 同一个标项 purchase_item 可能有多个 result_item 对应
+        while (
+            r_idx < result_len
+            and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
         ):
-            raise ParseError(
-                msg="标项名称不一致",
-                content=[f"purchase item: {purchase_item}, result item: {result_item}"],
-            )
+            result_item = _result[r_idx]
+            # 标项名称不一致
+            if (
+                result_item.get(constants.KEY_BID_ITEM_NAME, None)
+                and purchase_item[constants.KEY_BID_ITEM_NAME]
+                != result_item[constants.KEY_BID_ITEM_NAME]
+            ):
+                raise ParseError(
+                    msg="标项名称不一致",
+                    content=[
+                        f"purchase item: {purchase_item}, result item: {result_item}"
+                    ],
+                )
+            # 标项名称
+            result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
+                constants.KEY_BID_ITEM_NAME
+            ]
+            # 标项数量
+            result_item[constants.KEY_BID_ITEM_QUANTITY] = purchase_item[
+                constants.KEY_BID_ITEM_QUANTITY
+            ]
+            # 标项预算
+            result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[
+                constants.KEY_BID_ITEM_BUDGET
+            ]
+            r_idx += 1
 
-        result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
-            constants.KEY_BID_ITEM_NAME
-        ]
-        result_item[constants.KEY_BID_ITEM_QUANTITY] = purchase_item[
-            constants.KEY_BID_ITEM_QUANTITY
-        ]
-        result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[
-            constants.KEY_BID_ITEM_BUDGET
-        ]
     return _result
 
 
@@ -353,8 +385,11 @@ def calculate_total_budget(bid_items: list):
     :return:
     """
     total_budget = 0
+    bid_item_index = 0
     for item in bid_items:
-        total_budget += item[constants.KEY_BID_ITEM_BUDGET]
+        if item[constants.KEY_BID_ITEM_INDEX] != bid_item_index:
+            bid_item_index = item[constants.KEY_BID_ITEM_INDEX]
+            total_budget += item[constants.KEY_BID_ITEM_BUDGET]
     return total_budget
 
 
@@ -386,6 +421,7 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     item[constants.KEY_PROJECT_DISTRICT_CODE] = data.get(
         constants.KEY_PROJECT_DISTRICT_CODE, None
     )
+    item[constants.KEY_PROJECT_AUTHOR] = data.get(constants.KEY_PROJECT_AUTHOR, None)
     # 采购种类
     item[constants.KEY_PROJECT_CATALOG] = data.get(constants.KEY_PROJECT_CATALOG, None)
     # 采购方式
@@ -449,6 +485,14 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
             bid_items=item[constants.KEY_PROJECT_BID_ITEMS],
             budget=item[constants.KEY_PROJECT_TOTAL_BUDGET],
         )
+    else:
+        item[constants.KEY_PROJECT_TOTAL_AMOUNT] = 0
+
+    # 总时长
+    item[constants.KEY_PROJECT_TENDER_DURATION] = data.get(
+        constants.KEY_PROJECT_TENDER_DURATION, 0
+    )
+
     # 采购方信息
     item[constants.KEY_PURCHASER_INFORMATION] = data.get(
         constants.KEY_PURCHASER_INFORMATION, None

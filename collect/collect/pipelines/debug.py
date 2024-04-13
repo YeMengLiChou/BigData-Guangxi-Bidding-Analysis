@@ -1,4 +1,5 @@
 import json
+from typing import Union, TextIO
 
 from scrapy import signals
 from scrapy.crawler import Crawler
@@ -17,7 +18,7 @@ class DebugPipeline:
         return obj
 
     def __init__(self):
-        self.fp = None
+        self.fp: Union[TextIO, None] = None
 
     def spider_opened(self):
         self.fp = open("logs/item_debug.json", "w", encoding="utf-8")

@@ -73,7 +73,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
             match = re.match(r"(?:分标|标项)(\d+):(.*)", p)
             if match:
                 index, reason = match.group(1), match.group(2)
-                bid_item = common.get_template_bid_item(index=index, is_win=False)
+                bid_item = common.get_template_bid_item(index=int(index), is_win=False)
                 bid_item[constants.KEY_BID_ITEM_REASON] = common.parse_bid_item_reason(
                     reason
                 )

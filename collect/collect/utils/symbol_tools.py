@@ -25,7 +25,7 @@ def get_symbol(s: str, candidates: list[str]) -> Union[str, None]:
         if sym in s:
             return sym
     else:
-        raise ValueError(f"字符串 {s} 中没有 {candidates} 中的符号!")
+        raise ValueError(f"字符串 `{s}` 中没有 {candidates} 中的符号!")
 
 
 def get_parentheses_position(s: str) -> tuple[int, int]:

@@ -11,7 +11,7 @@ from typing_extensions import Self
 
 from collect.collect.core.api.category import CategoryApi
 from collect.collect.core.api.detail import DetailApi
-from collect.collect.core.parse import result, purchase, common
+from collect.collect.core.parse import result, purchase, common, raise_error
 from collect.collect.core.parse.result import SwitchError
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import (
@@ -50,7 +50,7 @@ def _make_result_request(
             pageSize=pageSize,
             categoryCode="ZcyAnnouncement2",
             publishDateBegin="2022-01-01",
-            publishDateEnd="2022-01-02",
+            publishDateEnd="2022-01-04",
         ),
         headers={"Content-Type": "application/json;charset=UTF-8"},
         dont_filter=dont_filter,
@@ -86,8 +86,8 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
         return
 
     # 如果已经解析过了，则无需解析，（存在于前一个结果公告不能解析，切换到下一个解析）
-    # 第一次解析时，类型为 str；经过解析后的类型为 list
-    if isinstance(meta.get(constants.KEY_PROJECT_RESULT_ARTICLE_ID, None), list):
+    # 第一次解析时，不存在该键
+    if meta.get(constants.KEY_DEV_START_RESULT_ARTICLE_ID, None):
         return
 
     # 所有结果公告
@@ -136,6 +136,7 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
                 f"解析其他公告时未发现采购公告相关信息: other_announcements: {other_announcements}"
             )
 
+    # 拿到当前的结果公告
     current_result_id = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
 
     meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID] = result_article_ids
@@ -144,8 +145,11 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
     meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = purchase_article_ids
     meta[constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE] = purchase_publish_dates
 
-    # 前一个结果公告
-    meta[constants.KEY_DEV_PRE_RESULT_ARTICLE_ID] = current_result_id
+    # 标记该公告机已经解析
+    parsed_result_id = 1 << result_article_ids.index(current_result_id)
+    meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID] = parsed_result_id
+    # 从现在开始
+    meta[constants.KEY_DEV_START_RESULT_ARTICLE_ID] = current_result_id
 
     # 计算招标持续时间
     if max_publish_date - min_publish_date <= 0:
@@ -178,8 +182,18 @@ class BiddingSpider(scrapy.Spider):
 
     special_article_ids = [
         # template: ("article_id", is_win: bool)
-        # ("U4nmS6%2BttFXSjN5otQ77OA%3D%3D", True)  # 存在多个采购公告和结果公告的
-        ("4ove6DOhBSozWjPJ3AxxUg==", False)
+        # ("U4nmS6%2BttFXSjN5otQ77OA%3D%3D", True),  # 存在多个采购公告和结果公告的
+        # ("4ove6DOhBSozWjPJ3AxxUg==", False),
+        # ("tzq4L6CLqRPYu%2BudtPsf0Q%3D%3D", False),  # 评审专家部分为 '/'
+        # ("lFwU0xqj/0siwuKKdvc0dw==", True),  # 没有解析到正常的结果公告，
+        # ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 同上
+        # ("anWmVy9QDIfWu/MveFjsbQ==", True),
+        # ("tzq4L6CLqRPYu+udtPsf0Q==", False),  # 解析联系方式存在问题
+        ("1jfaoapjjKBCOlDpMP2%2Bwg%3D%3D", True),  # 解析评审专家存在问题
+        (
+            "Ahi640Zu0NORfgNMr7Aswg%3D%3D",
+            False,
+        ),  # 解析结果公告异常（说不存在，但是存在）
     ]
 
     #  =========================================
@@ -189,8 +203,8 @@ class BiddingSpider(scrapy.Spider):
         1. 先请求些数据，通过返回的数据中的 total 字段来控制请求数量
         :return:
         """
+        # 调试有问题的 article_id
         if len(self.special_article_ids) > 0:
-            # 调试有问题的 article_id
             logger.warning(
                 f"Start Special Requests, total {len(self.special_article_ids)}"
             )
@@ -207,6 +221,7 @@ class BiddingSpider(scrapy.Spider):
                     },
                 )
         else:
+            # 正常爬取
             yield _make_result_request(
                 pageNo=1,
                 pageSize=1,
@@ -280,6 +295,8 @@ class BiddingSpider(scrapy.Spider):
                     meta[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data[
                         "isGovPurchase"
                     ]
+                    if constants.KEY_PROJECT_DISTRICT_CODE not in meta:
+                        meta[constants.KEY_PROJECT_DISTRICT_CODE] = data["districtCode"]
 
                     # 解析其他公告
                     _parse_other_announcements(
@@ -303,7 +320,14 @@ class BiddingSpider(scrapy.Spider):
                 purchase_article_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
                 if len(purchase_article_ids) == 0:
                     # 没有 “采购公告”，直接进入 make_item 生成 item
-                    yield common.make_item(data=meta, purchase_data=None)
+                    try:
+                        yield common.make_item(data=meta, purchase_data=None)
+                    except BaseException as e:
+                        raise_error(
+                            e,
+                            "生成 item 时出现异常",
+                            content=[json.dumps(meta, ensure_ascii=False, indent=4)],
+                        )
                 else:
                     # 存在 “采购公告”
                     yield _make_detail_request(
@@ -322,6 +346,7 @@ class BiddingSpider(scrapy.Spider):
         :param meta:
         :return:
         """
+
         # 已经解析的列表
         result_ids = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
         if not isinstance(result_ids, list):
@@ -330,17 +355,34 @@ class BiddingSpider(scrapy.Spider):
                 content=[result_ids],
             )
         # 前一个公告id
-        pre_result_id = meta[constants.KEY_DEV_PRE_RESULT_ARTICLE_ID]
-        next_result_id = None
+        parsed_result_id: int = meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID]
+        # 最开始的结果公告
+        start_result_id = meta[constants.KEY_DEV_START_RESULT_ARTICLE_ID]
+        # 下一个需要切换的结果公告id
+        next_result_id, next_idx = None, -1
+        m = len(result_ids)
+        # 使用位运算找到还没解析的结果公告
+        for i in range(m):
+            if (parsed_result_id >> i) & 1 == 0:
+                next_result_id = result_ids[i]
+                next_idx = i
+                break
 
-        for idx in range(1, len(result_ids)):
-            if result_ids[idx - 1] == pre_result_id:
-                next_result_id = result_ids[idx]
+        # 如果和起点一样，则查找逻辑存在问题，需要修改
+        if next_result_id and next_result_id == start_result_id:
+            raise ParseError(
+                msg="遍历结果公告逻辑错误，请检查",
+                content=[f"parsed_article_id: {bin(parsed_result_id)[2:]}"].extend(
+                    result_ids
+                ),
+            )
 
         if next_result_id:
             # 切换到下一个结果公告
             logger.warning(f"已经切换到 {next_result_id} 结果公告进行爬取")
-            meta[constants.KEY_DEV_PRE_RESULT_ARTICLE_ID] = next_result_id
+            # 标记该结果已经解析了
+            parsed_result_id |= 1 << next_idx
+            meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID] = parsed_result_id
             return _make_detail_request(
                 articleId=next_result_id,
                 callback=self.parse_result_detail_content,
@@ -349,7 +391,9 @@ class BiddingSpider(scrapy.Spider):
         else:
             raise ParseError(
                 msg="不存在其他的结果公告可以解析",
-                content=[f"pre_article_id: {pre_result_id}"].extend(result_ids),
+                content=[f"parsed_article_id: {bin(parsed_result_id)[2:]}"].extend(
+                    result_ids
+                ),
             )
 
     @stats.function_stats(logger)
@@ -368,7 +412,18 @@ class BiddingSpider(scrapy.Spider):
             # 更新 html 内容
             purchase_data = purchase.parse_html(html_content=data["content"])
 
-            yield common.make_item(meta, purchase_data)
+            try:
+                yield common.make_item(data=meta, purchase_data=purchase_data)
+            except BaseException as e:
+                raise_error(
+                    e,
+                    "生成 item 时出现异常",
+                    content=[
+                        json.dumps(meta, ensure_ascii=False, indent=4),
+                        "------- split line ----------------",
+                        json.dumps(purchase_data, ensure_ascii=False, indent=4),
+                    ],
+                )
         else:
             # TODO: 加入 retry 功能
             self.logger.error(f"purchase response not success: {response.text}")

@@ -102,11 +102,6 @@ KEY_PROJECT_DISTRICT_CODE = "district_code"
 项目-项目所在行政区划代码
 """
 
-KEY_PROJECT_DISTRICT_NAME = "district_name"
-"""
-项目-项目所在行政区划名称 (x)
-"""
-
 KEY_PROJECT_CATALOG = "catalog"
 """
 项目-项目采购所属种类
@@ -249,9 +244,14 @@ KEY_BID_ITEM_REASON = "reason"
 
 # =========================== dev key =====================
 
-KEY_DEV_PRE_RESULT_ARTICLE_ID = "pre_result_article_id"
+KEY_DEV_PARRED_RESULT_ARTICLE_ID = "parsed_result_article_id"
 """
-前一个结果公告id
+已经解析到的结果公告id——位运算
+"""
+
+KEY_DEV_START_RESULT_ARTICLE_ID = "start_result_article_id"
+"""
+最开始的结果公告id
 """
 
 # ========================= part key =====================
