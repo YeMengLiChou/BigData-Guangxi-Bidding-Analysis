@@ -11,8 +11,9 @@ from typing_extensions import Self
 
 from collect.collect.core.api.category import CategoryApi
 from collect.collect.core.api.detail import DetailApi
-from collect.collect.core.parse import result, purchase, common, raise_error
-from collect.collect.core.parse.result import SwitchError
+from collect.collect.core.error import SwitchError
+from collect.collect.core.parse import result, purchase, common
+from collect.collect.core.parse.result import errorhandle
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import (
     redis_tools as redis,
@@ -152,17 +153,19 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
     meta[constants.KEY_DEV_START_RESULT_ARTICLE_ID] = current_result_id
 
     # 计算招标持续时间
-    if max_publish_date - min_publish_date <= 0:
+    tender_duration = time_tools.now_timestamp() - min_publish_date
+    if tender_duration <= 0:
         raise ParseError(
-            msg=f"解析 other_announcement 时出现异常, duration计算为 {max_publish_date - min_publish_date}",
-            content=other_announcements.extend(
+            msg=f"解析 other_announcement 时出现异常, duration计算为 {tender_duration}",
+            content=[
+                other_announcements,
                 [
                     f"min_publish_date: {min_publish_date}",
                     f"max_publish_date: {max_publish_date}",
-                ]
-            ),
+                ],
+            ],
         )
-    meta[constants.KEY_PROJECT_TENDER_DURATION] = max_publish_date - min_publish_date
+    meta[constants.KEY_PROJECT_TENDER_DURATION] = tender_duration
 
 
 class BiddingSpider(scrapy.Spider):
@@ -182,18 +185,19 @@ class BiddingSpider(scrapy.Spider):
 
     special_article_ids = [
         # template: ("article_id", is_win: bool)
-        # ("U4nmS6%2BttFXSjN5otQ77OA%3D%3D", True),  # 存在多个采购公告和结果公告的
-        # ("4ove6DOhBSozWjPJ3AxxUg==", False),
-        # ("tzq4L6CLqRPYu%2BudtPsf0Q%3D%3D", False),  # 评审专家部分为 '/'
-        # ("lFwU0xqj/0siwuKKdvc0dw==", True),  # 没有解析到正常的结果公告，
-        # ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 同上
-        # ("anWmVy9QDIfWu/MveFjsbQ==", True),
-        # ("tzq4L6CLqRPYu+udtPsf0Q==", False),  # 解析联系方式存在问题
-        ("1jfaoapjjKBCOlDpMP2%2Bwg%3D%3D", True),  # 解析评审专家存在问题
-        (
-            "Ahi640Zu0NORfgNMr7Aswg%3D%3D",
-            False,
-        ),  # 解析结果公告异常（说不存在，但是存在）
+        # ("rr91aR+tRtF6REnhbSWTDw==", False),  # 废标理由共用
+        # ("NdzojgV6OhU9W3SqCK65nQ==", True),  # 评审专家粘连+无表格的中标信息
+        # ("IwcucEsf2aZ4tbS2VN2GGQ==", True),  # 废标理由存在新的格式:标项2投标供应商数量不符合要求,系统自动废标
+        # ("2wbHrTckeSdD9gz4WZrPgg==", True),  # 奇葩的金额
+        # ("ZojeS8Mufd1qJwHuJAaIbw==", False),  # 新的废标理由
+        # ("IvqpsDUCGqo0HqzuGSkTCg==", False),  # 奇怪的废标理由
+        # ("kvpgcrvQp13GWXtT8xfZLQ==", True),  # 奇怪的金额
+        # ("1YGqWSb+yZPgy8AryGbEwQ==", True),  # 无表格的中标信息
+        # ("iHyii/GCTMIcxcVU4diMrQ==", False),  # 采购信息新的
+        # ("8lnjOLrOkz9DSUdnjPZfqA==", False),  # 废标理由共用
+        # ("HKor1SEeN02slN/XvtayYg==", False),  # 看是废标实际上是终止
+        # ("Sfb/HdmkZ9wKtTvcGOIfjQ==", False),  # 需要切换采购公告
+        # ("6OPa2XaYAImxu/6nudSv+g==", True),  # 需要切换采购公告
     ]
 
     #  =========================================
@@ -272,7 +276,6 @@ class BiddingSpider(scrapy.Spider):
                     meta=meta,
                 )
         else:
-            # TODO: 加入 retry 功能
             self.logger.error(f"result response not success: {response.text}")
 
     @stats.function_stats(logger)
@@ -295,6 +298,11 @@ class BiddingSpider(scrapy.Spider):
                     meta[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data[
                         "isGovPurchase"
                     ]
+                    # TODO: 判断是否为中标候选人公示，后期完善
+                    title = data["title"]
+                    if title and ("中标候选人" in title):
+                        meta[constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE] = True
+
                     if constants.KEY_PROJECT_DISTRICT_CODE not in meta:
                         meta[constants.KEY_PROJECT_DISTRICT_CODE] = data["districtCode"]
 
@@ -302,6 +310,10 @@ class BiddingSpider(scrapy.Spider):
                     _parse_other_announcements(
                         other_announcements=data["announcementLinkDtoList"], meta=meta
                     )
+
+                    # 判断是否为所需要的结果公告
+                    if common.check_unuseful_announcement(data["announcementType"]):
+                        raise SwitchError("该结果公告并非所需要的")
 
                     meta.update(
                         result.parse_html(
@@ -323,7 +335,7 @@ class BiddingSpider(scrapy.Spider):
                     try:
                         yield common.make_item(data=meta, purchase_data=None)
                     except BaseException as e:
-                        raise_error(
+                        errorhandle.raise_error(
                             e,
                             "生成 item 时出现异常",
                             content=[json.dumps(meta, ensure_ascii=False, indent=4)],
@@ -336,7 +348,6 @@ class BiddingSpider(scrapy.Spider):
                         meta=meta,
                     )
         else:
-            # TODO: 加入 retry 功能
             self.logger.error(f"result response not success: {response.text}")
 
     @stats.function_stats(logger, log_params=True)
@@ -352,7 +363,7 @@ class BiddingSpider(scrapy.Spider):
         if not isinstance(result_ids, list):
             raise ParseError(
                 msg="switch_other_announcement 存在异常，未解析 result_ids 为 list",
-                content=[result_ids],
+                content=["error result_ids", result_ids],
             )
         # 前一个公告id
         parsed_result_id: int = meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID]
@@ -372,9 +383,10 @@ class BiddingSpider(scrapy.Spider):
         if next_result_id and next_result_id == start_result_id:
             raise ParseError(
                 msg="遍历结果公告逻辑错误，请检查",
-                content=[f"parsed_article_id: {bin(parsed_result_id)[2:]}"].extend(
-                    result_ids
-                ),
+                content=[
+                    f"parsed_article_id: {bin(parsed_result_id)[2:]}",
+                    *result_ids,
+                ],
             )
 
         if next_result_id:
@@ -391,9 +403,29 @@ class BiddingSpider(scrapy.Spider):
         else:
             raise ParseError(
                 msg="不存在其他的结果公告可以解析",
-                content=[f"parsed_article_id: {bin(parsed_result_id)[2:]}"].extend(
-                    result_ids
-                ),
+                content=[
+                    f"parsed_article_id: {bin(parsed_result_id)[2:]}",
+                    *result_ids,
+                ],
+            )
+
+    @stats.function_stats(logger)
+    def switch_other_purchase_announcement(self, meta: dict):
+        """
+        切换其他采购公告
+        :param meta:
+        :return:
+        """
+        parsed: int = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
+        purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+        for i in range(len(purchase_ids)):
+            if ((parsed >> i) & 1) == 0:
+                return _make_detail_request(
+                    articleId=purchase_ids[i], callback=self.parse_purchase, meta=meta
+                )
+        else:
+            raise ParseError(
+                f"采购公告没有任何标项信息： {purchase_ids} - {bin(parsed)}"
             )
 
     @stats.function_stats(logger)
@@ -405,27 +437,53 @@ class BiddingSpider(scrapy.Spider):
         """
         response_body = json.loads(response.text)
         if response_body.get("success", False):
-            data = response_body["result"]["data"]
-            meta = response.meta
+            data: dict = response_body["result"]["data"]
+            meta: dict = response.meta
+
+            # 首先判断是不是第一次解析采购公告
+            if constants.KEY_DEV_START_PURCHASE_ARTICLE_ID not in meta:
+                # 当前公告id
+                current_id = data["articleId"]
+                meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID] = current_id
+                # 定位解析位置
+                purchase_ids: list = meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID]
+                index = purchase_ids.index(current_id)
+                parsed = 1 << index
+                # 标记当前位置
+                meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
+            else:
+                print(meta)
+                parsed = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
+                purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+                index = purchase_ids.index(data["articleId"])
+                parsed |= 1 << index
+                meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
 
             # TODO: 可能存在多个采购公告，考虑 SwitchError
-            # 更新 html 内容
-            purchase_data = purchase.parse_html(html_content=data["content"])
-
+            purchase_data = {}
             try:
+                # 更新 html 内容
+                purchase_data = purchase.parse_html(html_content=data["content"])
+
+                # 生成 item
                 yield common.make_item(data=meta, purchase_data=purchase_data)
+            except SwitchError:
+                logger.warning("采购公告没有标项信息")
+                yield self.switch_other_purchase_announcement(meta=meta)
+                return
             except BaseException as e:
-                raise_error(
+                errorhandle.raise_error(
                     e,
                     "生成 item 时出现异常",
                     content=[
-                        json.dumps(meta, ensure_ascii=False, indent=4),
+                        "result_data",
+                        list(data.items()),
                         "------- split line ----------------",
-                        json.dumps(purchase_data, ensure_ascii=False, indent=4),
+                        "purchase_data",
+                        list(purchase_data.items()),
                     ],
                 )
         else:
-            # TODO: 加入 retry 功能
             self.logger.error(f"purchase response not success: {response.text}")
 
 

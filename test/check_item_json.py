@@ -33,9 +33,13 @@ def check_item_json(json_data: list):
 
         index += 1
         if not ok:
-            print(f"{index} not ok ----------------\n\n")
+            print(f"{index} not ok {item[constant.constants.KEY_PROJECT_RESULT_ARTICLE_ID]}\n\n")
         else:
-            print(f"{index} ok ----------------\n\n")
+            print(f"{index} ok.\n\n")
+
+        government_purchase = item['is_government_purchase']
+        if government_purchase:
+            print("has")
 
 
 if __name__ == '__main__':

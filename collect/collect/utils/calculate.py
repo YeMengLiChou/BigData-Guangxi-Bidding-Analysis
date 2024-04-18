@@ -14,6 +14,16 @@ def decimal_subtract(a: str, b: str) -> str:
     return str(Decimal(a) - Decimal(b))
 
 
+def decimal_div(a: str, b: str) -> float:
+    """
+    加法
+    :param a:
+    :param b:
+    :return:
+    """
+    return round(float(str(Decimal(a) / Decimal(b))), 2)
+
+
 def try_float(string: str):
     try:
         return float(string)
@@ -58,11 +68,11 @@ def parse_string_with_unit(string: str) -> float:
     return integer + decimal
 
 
-def parse_unit(string: str) -> float:
+def parse_unit(string: str) -> int:
     """
     解析单位
     :param string:
-    :return:
+    :return: 0 为百分比，1_0000 为 万, 1_0000_0000 为亿
     """
     if "%" in string:
         return 0
@@ -74,4 +84,4 @@ def parse_unit(string: str) -> float:
 
 
 if __name__ == "__main__":
-    pass
+    print(decimal_div("1", "0.022"))

@@ -1,4 +1,6 @@
-from typing import Union
+import typing
+import typing_extensions
+from typing import Union, Type
 
 
 def get_comma_symbol(s: str) -> Union[str, None]:
@@ -14,18 +16,24 @@ def get_comma_symbol(s: str) -> Union[str, None]:
         return None
 
 
-def get_symbol(s: str, candidates: list[str]) -> Union[str, None]:
+def get_symbol(
+    s: str, candidates: typing.Iterable[str], raise_error: bool = True
+) -> Union[str, None]:
     """
     从 coordinators 中获取 s 中存在的符号
     :param s:
-    :param candidates:
+    :param candidates: 候选的标点符号
+    :param raise_error: 是否抛出异常
     :return:
     """
     for sym in candidates:
         if sym in s:
             return sym
     else:
-        raise ValueError(f"字符串 `{s}` 中没有 {candidates} 中的符号!")
+        if raise_error:
+            raise ValueError(f"字符串 `{s}` 中没有 {candidates} 中的符号!")
+        else:
+            return None
 
 
 def get_parentheses_position(s: str) -> tuple[int, int]:

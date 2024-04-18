@@ -10,7 +10,7 @@ from typing import Union, Any
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
-
+from constant import constants
 from collect.collect.utils import time
 
 logger = logging.getLogger(__name__)
@@ -22,52 +22,76 @@ class ParseError(Exception):
     def __init__(
         self,
         msg: str,
-        content: Union[list[str], None] = None,
-        url: Union[str, None] = None,
+        article_id: Union[list, None] = None,
+        start_article_id: Union[str, None] = None,
+        parsed_article_id: int = 0,
+        article_ids: Union[list[str], None] = None,
+        is_win: Union[bool, None] = None,
+        content: Union[list, None] = None,
         error: Union[BaseException, None] = None,
         timestamp: int = time.now_timestamp(),
-        response_status: int = -1,
-        response_body: Union[str, None] = None,
     ):
         """
         :param msg: 出错原因
-        :param url: 出错 url
+        :param article_id: 出错所在 id
+        :param parsed_article_id： 解析过的 id
+        :param start_article_id 开始的公告
         :param content: 解析内容
         :param error: 上一层异常
         :param timestamp: 出现时间戳
-        :param response_status: 所属响应状态码
-        :param response_body: 所属响应
         """
         self.message = msg
         self.content = content
-        self.url = url
         self.timestamp = timestamp
         self.error = error
-        self.response_status = response_status
-        self.response_body = response_body
+        self.article_id = article_id
+        self.article_ids = article_ids
+        self.start_article_id = start_article_id
+        self.parsed_article_id = parsed_article_id
+        self.is_win = is_win
         self.exc_info = traceback.format_tb(
             self.error.__traceback__ if self.error else self.__traceback__
         )
 
     def __str__(self):
+        if self.is_win is None:
+            result = "unknown"
+        elif self.is_win:
+            result = "win"
+        else:
+            result = "not win"
+        content = '\n'.join(self.content)
         return (
             f"ParseError(\n"
             f"\tmsg: {self.message}\n"
-            f"\turl: {self.url}\n"
+            f"\tarticle_id: {self.article_id}\n"
+            f"\tstart_article_id({result}): {self.start_article_id}\n"
+            f"\tparsed: {bin(self.parsed_article_id)[2:]}\n"
+            f"\tall_article_ids: {self.article_ids}\n"
             f"\ttimestamp: {time.dateformat(self.timestamp)}\n"
-            f"\terror: {self.error.__repr__()}\n"
-            f"\tresponse_stats: {self.response_status}\n"
+            f"\terror: {'None' if not self.error else self.error.__repr__()}\n"
+            f"\tcontent: {self.content}"
         )
 
     __repr__ = __str__
 
     def to_dict(self):
+        if self.is_win is None:
+            result = "unknown"
+        elif self.is_win:
+            result = "win"
+        else:
+            result = "not win"
         return {
             "msg": self.message,
-            "url": self.url,
+            "article_info": {
+                f"error_article": self.article_id,
+                f"start_article({result})": self.start_article_id,
+                "parsed_article": bin(self.parsed_article_id)[2:],
+                "all_article_ids": self.article_ids,
+            },
             "timestamp": time.dateformat(self.timestamp),
             "error": self.error.__repr__(),
-            "response": {"status": self.response_status, "data": self.response_body},
             "content": self.content,
             "exc_info": self.exc_info,
         }
@@ -88,19 +112,45 @@ def ensure_file_exist(file: str):
         path.touch(exist_ok=True)
 
 
-def complete_error(
-    error: ParseError, response: Response, contains_response_body: bool = True
-):
+def complete_error(error: ParseError, response: Response):
     """
     补充部分信息
-    :param contains_response_body: 是否赋值 body
     :param error:
     :param response:
     :return:
     """
-    error.response_status = response.status
-    error.response_body = response.text if contains_response_body else ""
-    error.url = response.url
+    if not error.is_win:
+        error.is_win = response.meta.get(constants.KEY_PROJECT_IS_WIN_BID, None)
+    # 出现错误的url
+    if not error.article_id:
+        param = urllib.parse.urlparse(url=response.url).query
+        param = urllib.parse.parse_qs(param)
+        error.article_id = param.get("articleId", None)[0]
+    # 所有公告id
+    if not error.article_ids:
+        error.article_ids = response.meta.get(
+            constants.KEY_PROJECT_RESULT_ARTICLE_ID, None
+        )
+        if not error.article_ids:
+            error.article_ids = response.meta.get(
+                constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None
+            )
+        else:
+            error.article_ids.append("|")
+            error.article_ids.extend(
+                response.meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None)
+            )
+    # 最开始的id
+    if not error.start_article_id:
+        error.start_article_id = response.meta.get(
+            constants.KEY_DEV_START_RESULT_ARTICLE_ID, None
+        )
+    # 解析过后的id标记
+    if error.parsed_article_id == 0:
+        error.parsed_article_id = response.meta.get(
+            constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID, 0
+        )
+
     if len(error.exc_info) == 0:
         error.exc_info = traceback.format_tb(error.__traceback__)
 
@@ -233,22 +283,22 @@ class ParseErrorHandlerMiddleware:
     ):
         # 处理 ParseError
         if isinstance(exception, ParseError):
-            complete_error(exception, response, self.contains_response_body)
-            url = exception.url
+            exception: ParseError
+            complete_error(exception, response)
+            url = response.url
             spider.crawler.stats.inc_value("parse_error/total")
             articleId = self._check_url_duplicated(url)
             if not articleId:
                 logger.warning(
                     f"catch a duplicated parse error:\n"
-                    f"url: {exception.url}\n"
+                    f"id: {exception.article_id}\n"
                     f"msg: {exception.message}"
                 )
                 spider.crawler.stats.inc_value("parse_error/duplicated")
             else:
                 logger.warning(
                     f"catch a parse error:\n"
-                    f"url: {exception.url}\n"
-                    f"id: {urllib.parse.unquote(articleId)}\n"
+                    f"id: {exception.article_id}\n"
                     f"msg: {exception.message}"
                 )
                 spider.crawler.stats.inc_value("parse_error/non_repeat")

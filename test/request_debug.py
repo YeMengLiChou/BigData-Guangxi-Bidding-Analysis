@@ -36,4 +36,4 @@ def request_detail(article_id: str):
 
 
 if __name__ == '__main__':
-    request_detail("Ahi640Zu0NORfgNMr7Aswg%3D%3D")
+    request_detail("9Nl264NBe3kToCeHa1bpog==")

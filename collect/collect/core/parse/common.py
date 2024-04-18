@@ -113,6 +113,52 @@ def startswith_number_index(text: str) -> int:
     return value
 
 
+def check_win_bid_announcement(announcement_type: int) -> bool:
+    """
+    判断是否为中标公告
+    :param announcement_type:
+    :return:
+    """
+    return announcement_type in [
+        constants.ANNOUNCEMENT_TYPE_WIN,
+        constants.ANNOUNCEMENT_TYPE_DEAL,
+        constants.ANNOUNCEMENT_TYPE_WIN_AND_DEAL,
+    ]
+
+
+def check_termination_announcement(announcement_type: int) -> bool:
+    """
+    判断是否为终止公告
+    :param announcement_type:
+    :return:
+    """
+    return announcement_type == constants.ANNOUNCEMENT_TYPE_TERMINATION
+
+
+def check_not_win_bid_announcement(announcement_type: int) -> bool:
+    """
+    判断是否为未中标公告
+    :param announcement_type:
+    :return:
+    """
+    return announcement_type == constants.ANNOUNCEMENT_TYPE_NOT_WIN
+
+
+def check_unuseful_announcement(announcement_type: int) -> bool:
+    """
+    判断是否为不需要的公告
+    :param announcement_type:
+    :return:
+    """
+    return announcement_type not in [
+        constants.ANNOUNCEMENT_TYPE_NOT_WIN,  # 废标
+        constants.ANNOUNCEMENT_TYPE_WIN,  # 中标
+        constants.ANNOUNCEMENT_TYPE_DEAL,  # 成交
+        constants.ANNOUNCEMENT_TYPE_WIN_AND_DEAL,  # 中标（成交）
+        constants.ANNOUNCEMENT_TYPE_TERMINATION,  # 终止公告
+    ]
+
+
 @stats.function_stats(logger)
 def parse_review_experts(part: list[str]) -> dict:
     """
@@ -121,8 +167,15 @@ def parse_review_experts(part: list[str]) -> dict:
     :return:
     """
     data = dict()
-    # 拿到后面部分的内容
-    dist = "".join(part).replace("评审专家名单：", "")  # 部分带有该前缀
+
+    counter = {}
+    for i in range(len(part)):
+        split_symbol = sym.get_symbol(
+            part[i], ("、", "，", ",", " ", "\u3000"), raise_error=False
+        )
+        if split_symbol is not None:
+            # 存在分隔符
+            counter[split_symbol] = counter.get(split_symbol, 0) + 1
 
     # 评审小组
     review_experts = []
@@ -131,13 +184,20 @@ def parse_review_experts(part: list[str]) -> dict:
     representors = []
     data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representors
 
-    if dist == "/":
-        return data
+    # 存在分隔符
+    if len(counter) != 0:
+        # 拿出现次数的分隔符
+        max_symbol = max(counter, key=lambda x: counter[x])
+        # 拿到后面部分的内容
+        dist = "".join(part).replace("评审专家名单：", "")  # 部分带有该前缀
+        if dist == "/":
+            return data
+        # 分隔
+        persons = dist.split(max_symbol)
+    # 没有分隔符，表示已经是分隔好的形式
+    else:
+        persons = part
 
-    # 拿到分隔符
-    split_symbol = sym.get_symbol(dist, [",", "，", "、"])
-    # 分隔
-    persons = dist.split(split_symbol)
     for p in persons:
         # 部分去掉句号
         p = p.replace("。", "")
@@ -212,8 +272,31 @@ def get_template_bid_item(is_win: bool, index: int) -> dict:
 def parse_bid_item_reason(reason: str) -> int:
     # 1.有效供应商(不足三家)
     # 2.提交投标文件的投标供应商数量(不足三家),本项目废标
-    if "不足三家" in reason and "供应商" in reason:
+    # 3.投标供应商(数量不符合)要求,系统自动废标
+    # 4.通过符合性审查的投标人不足3家，作废标处理。
+    if "不足三家" in reason or "不足3家" in reason or "数量不符合" in reason:
         return constants.BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS
+
+    # 1. "评标委员会发现招标文件存在歧义，故本次采购活动作废标处理。
+    if "存在歧义" in reason and "招标文件" in reason:
+        return constants.BID_ITEM_REASON_BIDDING_DOCUMENTS_AMBIGUITY
+
+    # 1. 出现影响采购公正的违法、违规行为
+    if "违法、违规行为" in reason:
+        return constants.BID_ITEM_REASON_ILLEGAL
+
+    # 1.  因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
+    if "重新开展采购" in reason:
+        return constants.BID_ITEM_REASON_REOPEN
+
+    # 1. 因操作失误，评委人数不符合要求，且系统无法修改，导致项目无法评审，因此流标。
+    if "无法评审" in reason:
+        return constants.BID_ITEM_REASON_UNABLE_REVIEW
+
+    # 1. 三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
+    if "不通过符合性审查" in reason:
+        return constants.BID_ITEM_REASON_NOT_PASS_COMPLIANCE_REVIEW
+
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
 
@@ -290,7 +373,9 @@ def parse_contact_info(part: list[str]) -> dict:
 
 
 @stats.function_stats(logger)
-def _merge_bid_items(_purchase: list, _result: list) -> list:
+def _merge_bid_items(
+    _purchase: list, _result: list, cancel_reason_only_one: bool, data:dict
+) -> list:
     """
     将两部分的标项信息合并
     :param _purchase:
@@ -301,6 +386,14 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
     _purchase.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
     _result.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
 
+    # 仅有一个废标理由，所有标项共用
+    if cancel_reason_only_one:
+        for i in range(len(_purchase)):
+            _purchase[i][constants.KEY_BID_ITEM_REASON] = _result[0][
+                constants.KEY_BID_ITEM_REASON
+            ]
+        return _purchase
+
     n = len(_purchase)
     if len(_result) == 0:
         m = 0
@@ -310,6 +403,16 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
             constants.KEY_BID_ITEM_INDEX
         ]
     if n != m:
+        # 候选人公告导致的标项不一致，TODO：到时候特判处理一下
+        if constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE in data:
+            raise ParseError(
+                msg="标项数量不一致，存在候选人公告！",
+                content=[
+                    f"purchase length: {n}, result length: {m}",
+                    _purchase,
+                    _result,
+                ],
+            )
         raise ParseError(
             msg="标项数量不一致",
             content=[f"purchase length: {n}, result length: {m}", _purchase, _result],
@@ -350,6 +453,7 @@ def _merge_bid_items(_purchase: list, _result: list) -> list:
             result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[
                 constants.KEY_BID_ITEM_BUDGET
             ]
+
             r_idx += 1
 
     return _result
@@ -401,14 +505,26 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     :param data:
     :return:
     """
-    # 存在 采购数据, 也就是存在标项
+    # 存在 采购数据, 也就是存在标项，
     if purchase_data:
-        # 合并标项
-        purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
-        result_bid_items = data.get(constants.KEY_PROJECT_BID_ITEMS, [])
-        data[constants.KEY_PROJECT_BID_ITEMS] = _merge_bid_items(
-            _purchase=purchase_bid_items, _result=result_bid_items
-        )
+        # 终止公告
+        if data.get(constants.KEY_PROJECT_IS_TERMINATION, False):
+            # 直接用 purchase 的 标项
+            data[constants.KEY_PROJECT_BID_ITEMS] = purchase_data.pop(
+                constants.KEY_PROJECT_BID_ITEMS, []
+            )
+        else:
+            # 合并标项
+            purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
+            result_bid_items = data.get(constants.KEY_PROJECT_BID_ITEMS, [])
+            data[constants.KEY_PROJECT_BID_ITEMS] = _merge_bid_items(
+                _purchase=purchase_bid_items,
+                _result=result_bid_items,
+                cancel_reason_only_one=data.get(
+                    constants.KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE, False
+                ),
+                data=data
+            )
         data.update(purchase_data)
 
     # 从 data 中取出所需要的信息
@@ -417,10 +533,14 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     item[constants.KEY_PROJECT_NAME] = data.get(constants.KEY_PROJECT_NAME, None)
     # 项目编号
     item[constants.KEY_PROJECT_CODE] = data.get(constants.KEY_PROJECT_CODE, None)
-    # 地区编号 TODO： 设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
+    # 地区编号
     item[constants.KEY_PROJECT_DISTRICT_CODE] = data.get(
         constants.KEY_PROJECT_DISTRICT_CODE, None
     )
+    # TODO： 设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
+    if not item[constants.KEY_PROJECT_DISTRICT_CODE]:
+        raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))
+
     item[constants.KEY_PROJECT_AUTHOR] = data.get(constants.KEY_PROJECT_AUTHOR, None)
     # 采购种类
     item[constants.KEY_PROJECT_CATALOG] = data.get(constants.KEY_PROJECT_CATALOG, None)
@@ -464,10 +584,9 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     )
     # 如果项目总预算存在，则需要和计算后的预算进行对比
     if total_budget:
-        # TODO: 可能存在误差
-        if calculated_budget != total_budget:
+        if abs(calculated_budget - total_budget) > 1e-5:
             raise ParseError(
-                msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致",
+                msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致（误差大于1e-5）",
                 content=data[constants.KEY_PROJECT_BID_ITEMS],
             )
         else:

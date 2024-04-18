@@ -1,9 +1,9 @@
 import logging
 import re
+from typing import Iterable, Union
 
-from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import calculate, debug_stats as stats
+from collect.collect.utils import calculate, debug_stats as stats, symbol_tools
 
 __all__ = [
     "purchase",
@@ -13,6 +13,127 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+# 正则表达式预处理，重复使用
+PATTERN_NUMBER_UNIT = re.compile(r"(\d+(\.\d*)?)[(（](\S+)[)）]")
+
+# 格式：  (非数字部分)(可能存在的冒号:)(金额数字)(可能存在的左括号)(非数字部分)(可能存在的右括号)
+PATTERN_DESC_NUMBER_UNIT = re.compile(
+    r"([^0-9]*)[:：]?(\d*(\.\d*)?)[(（]?([^（(0-9)）]+)[)）]?"
+)
+
+PATTERN_CHINESE_NUMBER = re.compile(r"([^0-9]*)[(（]?[¥￥]?(\d*(\.\d*)?)[)）]?")
+
+
+def check_substrings_in_string(string: str, substrings: Iterable[str]) -> bool:
+    """
+    检查字符串是否包含子字符串
+    :param string:
+    :param substrings:
+    :return:
+    """
+    for substring in substrings:
+        if substring in string:
+            return True
+    return False
+
+
+def parse_amount_and_percent(
+    string: str, raise_error: bool = True
+) -> tuple[Union[float, None], Union[bool, None]]:
+    """
+    解析金额和百分比
+    :param raise_error:
+    :param string:
+    :return:
+    """
+    string = string.strip()
+    # 格式：数字+单位
+    if match := PATTERN_NUMBER_UNIT.fullmatch(string):
+        amount_text, unit = match.groups()
+        amount = float(amount_text)
+        if unit == "元":
+            return amount, False
+        elif unit == "%":
+            return amount, True
+        else:
+            if not raise_error:
+                return None, None
+
+    # 匹配类型： [文字说明] :/： [金额] (/（[单位])/）
+    elif match := PATTERN_DESC_NUMBER_UNIT.fullmatch(string):
+        # 前缀描述，金额数字，小数位，单位
+        desc, amount_text, _, unit = match.groups()
+        parsed = True
+
+        # 服务总报价、竞标总报价、响应总报价、总价、最终评审价、最后报价、最终报价、投标总价、磋商总报价、投标总报价、单价报价合计、总价大写、金额
+        if check_substrings_in_string(
+            desc, substrings=("总价", "总报价", "最终", "最后", "合计", "金额", "合价")
+        ):
+            amount, is_percent = float(amount_text), False
+            if check_substrings_in_string(desc, substrings=("系数", "率")):
+                is_percent = True
+
+        # 报价、报价大写、投标报价、响应报价、竞标报价、磋商报价、
+        elif check_substrings_in_string(desc, substrings=("报价",)):
+            amount, is_percent = float(amount_text), False
+            if check_substrings_in_string(desc, substrings=("系数", "率")):
+                is_percent = True
+
+        # 检查是否为折扣系数关键词
+        elif check_substrings_in_string(desc, substrings=("折扣",)):
+            amount, is_percent = float(amount_text), True
+
+        # 收益率、利润率计算
+        # 1. 利润率=利润/成本
+        elif check_substrings_in_string(desc, substrings=("利润率", "收益率")):
+            amount, is_percent = float(amount_text), True
+            amount = calculate.decimal_div("100", str(amount))
+
+        # 检查是否为下浮系数关键词
+        # 1. 让利系数: （控制价-中标价) / 控制价
+        # 2. 优惠率：（基准价-中标价）/基准价
+        elif check_substrings_in_string(desc, substrings=("下浮", "优惠率", "让利")):
+            amount, is_percent = float(amount_text), True
+            amount = float(calculate.decimal_subtract("100", str(100 + amount)))
+
+        else:
+            # 出现其他内容，而且是带有百分比的，一致认为是折扣计算
+            if unit == "%":
+                amount, is_percent = float(amount_text), True
+            else:
+                parsed = False
+                amount, is_percent = -1, False
+
+        if parsed:
+            if unit == "%":
+                if not is_percent:
+                    raise ParseError(
+                        f"`{string}` 的单位：`{unit}` 不匹配预期的 %", content=[string]
+                    )
+                else:
+                    return amount, is_percent
+            elif unit == "元":
+                if is_percent:
+                    raise ParseError(
+                        f"`{string}` 的单位：`{unit}` 不匹配预期的 元", content=[string]
+                    )
+                else:
+                    return amount, is_percent
+            else:
+                raise ParseError(
+                    f"无法解析 `{string}` 的 单位：{unit}", content=[string]
+                )
+
+    # 匹配类型： [大写金额](¥/￥[小写金额])
+    elif match := PATTERN_CHINESE_NUMBER.fullmatch(string):
+        amount_chinese, amount_text, _ = match.groups()
+        return float(amount_text), False
+
+    if raise_error:
+        raise ParseError(msg=f"无法解析金额：`{string}`", content=[string])
+    else:
+        return None, None
 
 
 class AbstractFormatParser:
@@ -25,121 +146,38 @@ class AbstractFormatParser:
 
     @staticmethod
     @stats.function_stats(logger)
-    def parse_win_bid_item_amount(string: str) -> tuple[float, bool]:
+    def parse_win_bid_item_amount(amount_str: str) -> tuple[float, bool]:
         """
         解析中标结果中的项目金额
-        :param string:
+        :param amount_str:
         :return: 返回 (数值， 是否为百分比)
         """
+        split_sym = symbol_tools.get_symbol(amount_str, (",", "，"), raise_error=False)
+        if split_sym:
+            strs = amount_str.split(split_sym)
+        else:
+            strs = [amount_str]
 
-        def get_unit_with_bracket_symbol(s: str, unit: str) -> str:
-            bracket_symbol = ("(", ")") if "(" in s else ("（", "）")
-            return f"{bracket_symbol[0]}{unit}{bracket_symbol[1]}"
+        if len(strs) == 0:
+            raise ParseError(f"无法解析金额：{amount_str}", content=[amount_str])
 
-        # TODO 负责解析项目金额，适应各种格式
-        try:
-            res = calculate.try_float(string)
-            # 格式：全是数字，没有单位
-            if res:
-                return res, False
+        # 仅有一行
+        if len(strs) == 1:
+            amount, is_percent = parse_amount_and_percent(strs[0])
+            if amount is None:
+                raise ParseError(f"无法解析金额：{amount_str}", content=[amount_str])
+            else:
+                return amount, is_percent
 
-            # 格式：数字+单位
-            if calculate.startswith_digital(string):
-                amount = calculate.parse_string_with_unit(string)
-                unit = calculate.parse_unit(string)
-                if unit == 0:
-                    percent = True
-                else:
-                    percent = False
-                    amount *= unit
-                return amount, percent
+        # 多个数据
+        for s in strs:
+            amount, is_percent = parse_amount_and_percent(s, raise_error=False)
+            if amount is None:
+                continue
+            else:
+                return amount, is_percent
 
-            #  格式：单项合价（元） ③＝①×②：1278820（元）
-            if string.startswith("单项合价"):
-                endswith_yuan_unit = string.endswith(
-                    get_unit_with_bracket_symbol(string, "元")
-                )
-                endswith_percent_unit = string.endswith(
-                    get_unit_with_bracket_symbol(string, "%")
-                )
-                if endswith_yuan_unit or endswith_percent_unit:
-                    result = re.match(r"[^0-9]*(\d*(\.\d+)?)[^0-9]*", string)
-                    if result:
-                        amount = float(result.group(1))
-                        is_percent = endswith_percent_unit
-                        return amount, is_percent
-                else:
-                    raise_error(
-                        ParseError(f"无法解析金额：{string}"), msg="", content=[string]
-                    )
-
-            # 最终报价/报价:[金额]（元/%）
-            if (
-                string.startswith("报价")
-                or string.startswith("最终报价")
-                or string.startswith("总报价")
-            ):
-                endswith_yuan_unit = string.endswith(
-                    get_unit_with_bracket_symbol(string, "元")
-                )
-                endswith_percent_unit = string.endswith(
-                    get_unit_with_bracket_symbol(string, "%")
-                )
-                if endswith_yuan_unit or endswith_percent_unit:
-                    result = re.match(r"[^0-9]*(\d*(\.\d+)?)[^0-9]*", string)
-                    if result:
-                        amount = float(result.group(1))
-                        is_percent = endswith_percent_unit
-                        return amount, is_percent
-                else:
-                    raise_error(
-                        ParseError(f"无法解析金额：{string}"), msg="", content=[string]
-                    )
-
-            # 投标总报价（单价×127400×12）:1116024.00(元)
-            if string.startswith("投标总报价"):
-                colon_symbol = "：" if "：" in string else ":"
-                suffix = string.split(colon_symbol)[-1]
-                endswith_yuan_unit = suffix.endswith(
-                    get_unit_with_bracket_symbol(suffix, "元")
-                )
-                endswith_percent_unit = suffix.endswith(
-                    get_unit_with_bracket_symbol(suffix, "%")
-                )
-                if endswith_percent_unit or endswith_yuan_unit:
-                    result = re.match(r"[^0-9]*(\d*(\.\d+)?)[^0-9]*", suffix)
-                    if result:
-                        amount = float(result.group(1))
-                        is_percent = endswith_percent_unit
-                        return amount, is_percent
-                else:
-                    raise_error(
-                        ParseError(f"无法解析金额：{string}"), msg="", content=[string]
-                    )
-
-            # 下浮系数：(原始价格-现在价格)/原始价格*100%=下浮百分比
-            # 将其改为 100 - 下浮百分比
-            if string.startswith("下浮系数"):
-                result = re.match(r"[^0-9]*(\d*(\.\d+)?)[^0-9]*", string)
-                if result:
-                    amount = float(calculate.decimal_subtract("100", result.group(1)))
-                    is_percent = True
-                    return amount, is_percent
-
-            # 折扣率：就是打几折
-            # 将其改为 100 - 折扣百分比
-            if "折扣率" in string:
-                result = re.match(r"[^0-9]*(\d*(\.\d+)?)[^0-9]*", string)
-                if result:
-                    amount = float(calculate.decimal_subtract("100", result.group(1)))
-                    is_percent = True
-                    return amount, is_percent
-
-            raise ParseError(msg=f"标项金额存在未发现的格式: {string}")
-        except BaseException as e:
-            raise_error(
-                msg=f"标项金额存在未发现的格式: {string}", content=[string], error=e
-            )
+        raise ParseError(f"无法解析金额：{amount_str}", content=strs)
 
     @staticmethod
     def parse_bids_information(part: list[str]) -> list:
@@ -197,5 +235,13 @@ class AbstractFormatParser:
 
 
 if __name__ == "__main__":
-    text = "投标总报价（单价×127400×12）:1116024.00(元)"
-    print(AbstractFormatParser.parse_win_bid_item_amount(text))
+    text = ""
+    logging.basicConfig()
+    for p in text.split("\n"):
+        print(p)
+        try:
+            print(AbstractFormatParser.parse_win_bid_item_amount(p))
+        except Exception as e:
+            logging.exception(e)
+        finally:
+            print("----")

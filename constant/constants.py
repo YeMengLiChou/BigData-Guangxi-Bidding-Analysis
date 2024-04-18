@@ -55,6 +55,37 @@ BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS = 1
 标项-废标理由：供应商不足
 """
 
+BID_ITEM_REASON_BIDDING_DOCUMENTS_AMBIGUITY = 2
+"""
+标项-废标理由：招标文件存在歧义
+"""
+
+BID_ITEM_REASON_ILLEGAL = 3
+"""
+标项-废标理由：存在违规违法行为
+"""
+
+BID_ITEM_REASON_REOPEN = 4
+"""
+标项-废标理由：重新开展采购
+ex:
+    因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
+"""
+
+BID_ITEM_REASON_UNABLE_REVIEW = 5
+"""
+标项-废标理由：无法评审
+ex:
+    因操作失误，评委人数不符合要求，且系统无法修改，导致项目无法评审，因此流标。
+"""
+
+BID_ITEM_REASON_NOT_PASS_COMPLIANCE_REVIEW = 6
+"""
+标项-废标理由：不通过符合性审查
+ex:
+    三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
+"""
+
 PROJECT_AMOUNT_UNASSIGNED = -1
 """
 项目的总金额-未赋值
@@ -63,6 +94,43 @@ PROJECT_AMOUNT_UNASSIGNED = -1
 PROJECT_AMOUNT_FAILED = 0
 """
 项目的总金额：废标/终止
+"""
+
+# ===================== Scrape Constants ===================
+
+ANNOUNCEMENT_TYPE_WIN_AND_DEAL = 3004
+"""
+中标(公交)公告
+"""
+
+ANNOUNCEMENT_TYPE_WIN = 4005
+"""
+中标公告
+"""
+
+ANNOUNCEMENT_TYPE_NOT_WIN = 3007
+"""
+废标公告
+"""
+
+ANNOUNCEMENT_TYPE_DEAL = 4006
+"""
+成交公告
+"""
+
+ANNOUNCEMENT_TYPE_SHORTLISTED_FOR_TENDER = 3009
+"""
+招标资格入围公告
+"""
+
+ANNOUNCEMENT_TYPE_TERMINATION = 3015
+"""
+终止公告
+"""
+
+ANNOUNCEMENT_TYPE_SHORTLISTED_FOR_PUBLIC_TENDER = 4004
+"""
+公开招标入围公告
 """
 
 # ===================== Scrapy Item Key =====================
@@ -249,9 +317,29 @@ KEY_DEV_PARRED_RESULT_ARTICLE_ID = "parsed_result_article_id"
 已经解析到的结果公告id——位运算
 """
 
+KEY_DEV_PARRED_PURCHASE_ARTICLE_ID = "parsed_purchase_article_id"
+"""
+已经解析到的采购公告id——位运算
+"""
+
 KEY_DEV_START_RESULT_ARTICLE_ID = "start_result_article_id"
 """
 最开始的结果公告id
+"""
+
+KEY_DEV_START_PURCHASE_ARTICLE_ID = "start_purchase_article_id"
+"""
+最开始的结果公告id
+"""
+
+KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE = "only_one"
+"""
+废标理由仅有一个（多个标项共用）
+"""
+
+KEY_DEV_RESULT_CONTAINS_CANDIDATE = "contains_result_candidate"
+"""
+中标结果存在候选人公告
 """
 
 # ========================= part key =====================
