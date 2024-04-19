@@ -133,7 +133,7 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
             return constants.KEY_PART_WIN_BID
     else:
         # 废标结果部分
-        if "废标理由" in title:
+        if "废标" in title and ("原因" in title or "理由" in title):
             return constants.KEY_PART_NOT_WIN_BID
         # 终止原因
         if "终止" in title:
@@ -159,6 +159,20 @@ def parse_html(html_content: str, is_win_bid: bool):
             # 找以 “一、” 这种格式开头的字符串
             index = common.startswith_chinese_number(result[idx])
             if index > chinese_number_index:
+
+                # 存在一种废标情况，标题为 “二、项目废标的原因”，但是文本分开，需要特殊处理
+                if not is_win_bid:
+                    length = len(result[idx])
+                    if length < 9 and index == 2 and result[idx][2:].startswith("项目"):
+                        tmp_idx = idx
+                        # 往下查找直到长度满足
+                        while idx < n and length < 9:
+                            idx += 1
+                            length += len(result[idx])
+                        else:
+                            # 拼接
+                            result[idx] = ''.join(result[tmp_idx: idx + 1])
+
                 key_part = check_useful_part(is_win=is_win_bid, title=result[idx])
                 # 该部分为所需要的标题信息
                 if key_part:
