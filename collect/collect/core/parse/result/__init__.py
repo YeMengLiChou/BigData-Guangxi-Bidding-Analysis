@@ -6,7 +6,7 @@ from collect.collect.core import error
 from collect.collect.core.parse import common, errorhandle
 from collect.collect.core.parse.result import not_win, win
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import debug_stats as stats
+from collect.collect.utils import debug_stats as stats, symbol_tools
 from constant import constants
 
 try:
@@ -133,7 +133,7 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
             return constants.KEY_PART_WIN_BID
     else:
         # 废标结果部分
-        if "废标" in title and ("原因" in title or "理由" in title):
+        if ("废标" in title or "流标") and ("原因" in title or "理由" in title):
             return constants.KEY_PART_NOT_WIN_BID
         # 终止原因
         if "终止" in title:
@@ -177,6 +177,12 @@ def parse_html(html_content: str, is_win_bid: bool):
                 # 该部分为所需要的标题信息
                 if key_part:
                     chinese_number_index = index
+
+                    # 某些标题可能和后面的内容连成一块，需要分开
+                    if sym := symbol_tools.get_symbol(result[idx], (":", "："), raise_error=False):
+                        result.insert(idx + 1, result[idx][result[idx].index(sym) + 1:])
+                        n = len(result)
+
                     # 项目编号从 purchase 移动到此处
                     if key_part == constants.KEY_PART_PROJECT_CODE:
                         project_data[constants.KEY_PROJECT_CODE] = result[idx + 1]

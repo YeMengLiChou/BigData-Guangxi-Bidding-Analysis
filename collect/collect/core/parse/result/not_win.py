@@ -89,7 +89,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
         # 存在文本分开的情况
         tmp = "".join(part)
-
+        logger.warning(tmp)
         # 每个标项都有单独的理由说明
         if "标项" in tmp or "分标" in tmp:
             part = tmp.split("。")
