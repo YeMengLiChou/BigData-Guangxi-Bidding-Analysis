@@ -51,6 +51,11 @@ class WinBidStandardFormatParser(AbstractFormatParser):
 
     @staticmethod
     def __is_bid_item_index(s: str) -> bool:
+        """
+        判断是否为标项的序号
+        :param s:
+        :return:
+        """
         # 存在部分情况的需要
         return s.isdigit() or (  # 纯数字： 1、2、3...
             s[0].isalpha() and s[1:].isdigit()
@@ -116,15 +121,26 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         """
         idx, n, data = 0, len(part), []
         while idx < n:
+            print(part[idx], WinBidStandardFormatParser.__is_bid_item_index(part[idx]))
             if WinBidStandardFormatParser.__is_bid_item_index(part[idx]):
+                # 当前 idx 为序号
                 bid_item = common.get_template_bid_item(
                     index=int(part[idx]), is_win=False
                 )
+                # 标项名称
                 bid_item[constants.KEY_BID_ITEM_NAME] = part[idx + 1]
+                # 废标理由
                 bid_item[constants.KEY_BID_ITEM_REASON] = common.parse_bid_item_reason(
                     part[idx + 2]
                 )
-                idx += 4
+                # 某些情况下:  其他事项这一列为空，导致在预处理的时候就已经被过滤掉，这里需要判断一下
+                if idx + 3 < n:
+                    if WinBidStandardFormatParser.__is_bid_item_index(part[idx + 3]):
+                        idx += 3
+                    else:
+                        idx += 4
+                else:
+                    idx += 4
                 data.append(bid_item)
             else:
                 idx += 1
@@ -164,7 +180,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                     part[tmp_idx:idx]
                 )
                 cnt += 1
-            elif "中标（成交）金额" in part[idx]:
+            elif "中标（成交）金额" in part[idx] or "中标金额" in part[idx]:
                 idx += 1
                 tmp_idx = idx
                 # 某些情况下存在金额 “xxxx.xxx” 会被解析，显示解析后的数目少于 5
