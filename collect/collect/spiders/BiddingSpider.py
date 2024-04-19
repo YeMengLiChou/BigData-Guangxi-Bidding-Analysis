@@ -193,6 +193,7 @@ class BiddingSpider(scrapy.Spider):
 
     # ========== use for debug ================
 
+
     special_article_ids = [
         # template: ("article_id", is_win: bool)
         # ("rr91aR+tRtF6REnhbSWTDw==", False),  # 废标理由共用
@@ -218,10 +219,11 @@ class BiddingSpider(scrapy.Spider):
         # ("R99B3UWFEqrLF/tksnsgqw==", True), # 出现新的金额格式  价格:13185000(元)
         # ("QAI+LyiIc1LYJjpYA0omCA==", False),  # 废标理由共用
         # ("JfuMrotn+DZtCSb9lr5l8w==", True),  # 采购标项出现错误
+        # ("PmO7xF3SbGGRAmFiNUcxyQ==", False),  # parts 不足
         # ("Zq/T/LwmDS54RA5CZferSw==", False),  # 出现 “流标理由”
-        ("DkCsusC9o1iq9iNtt7jmsw==", False),  # parts 不足
+        # ("RWaFA6UZ54ytuJL5AsxQvQ==", False),  # parts 不足
+        # ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
     ]
-
     #  =========================================
 
     def start_requests(self):
@@ -499,14 +501,14 @@ class BiddingSpider(scrapy.Spider):
                 # 某些文章id返回的数据为None，需要预选处理
                 if data is None:
                     logger.warning(f" {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
-                    yield self.switch_other_purchase_announcement
-                    return
+                    yield self.switch_other_purchase_announcement(meta)
+                    return None
                 else:
                     # 在 2022 前的发布的公告大多格式不统一，直接切换
                     if data['publishDate'] < 1640966400000:
                         logger.warning(f"该公告 {get_articleId_from_url(response.url)} 在2022年前发布")
-                        yield self.switch_other_purchase_announcement
-                        return
+                        yield self.switch_other_purchase_announcement(meta)
+                        return None
 
                 # 更新 html 内容
                 purchase_data = purchase.parse_html(html_content=data["content"])
@@ -516,7 +518,7 @@ class BiddingSpider(scrapy.Spider):
             except SwitchError:
                 logger.warning("采购公告没有标项信息")
                 yield self.switch_other_purchase_announcement(meta=meta)
-                return
+                return None
             except BaseException as e:
                 errorhandle.raise_error(
                     e,

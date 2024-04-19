@@ -5,7 +5,7 @@ from collect.collect.core.parse import (
     common,
 )
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import debug_stats as stats
+from collect.collect.utils import debug_stats as stats, symbol_tools
 from constant import constants
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,6 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         """
         idx, n, data = 0, len(part), []
         while idx < n:
-            print(part[idx], WinBidStandardFormatParser.__is_bid_item_index(part[idx]))
             if WinBidStandardFormatParser.__is_bid_item_index(part[idx]):
                 # 当前 idx 为序号
                 bid_item = common.get_template_bid_item(
@@ -159,28 +158,60 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         :param part:
         :return:
         """
+
         idx, n, data = 0, len(part), []
+
+        def check_title():
+            """
+            检查标题是否是标题
+            :return:
+            """
+            if "供应商名称" in part[idx]:
+                return True
+            if "供应商地址" in part[idx]:
+                return True
+            if "中标（成交）金额" in part[idx] or "中标金额" in part[idx]:
+                return True
+            return False
+
+        def handle_title():
+            """
+            将连在一起的内容分离
+            :return:
+            """
+            logger.warning(part[idx])
+            if not symbol_tools.endswith_colon_symbol(part[idx]):
+                colon_idx = part[idx].find("：")
+                if colon_idx == -1:
+                    colon_idx = part[idx].find(":")
+                part.insert(idx + 1, part[idx][colon_idx + 1:])
+                nonlocal n
+                n += 1
+
         # 默认只有一个
         item = common.get_template_bid_item(index=1, is_win=True)
         cnt = 0
         while idx < n:
             if "供应商名称" in part[idx]:
+                handle_title()
                 idx += 1
                 tmp_idx = idx
-                while idx < n and common.startswith_number_index(part[idx]) == -1:
+                while idx < n and common.startswith_number_index(part[idx]) == -1 and not check_title():
                     idx += 1
                 item[constants.KEY_BID_ITEM_SUPPLIER] = "".join(part[tmp_idx:idx])
                 cnt += 1
             elif "供应商地址" in part[idx]:
+                handle_title()
                 idx += 1
                 tmp_idx = idx
-                while idx < n and common.startswith_number_index(part[idx]) == -1:
+                while idx < n and common.startswith_number_index(part[idx]) == -1 and not check_title():
                     idx += 1
                 item[constants.KEY_BID_ITEM_SUPPLIER_ADDRESS] = "".join(
                     part[tmp_idx:idx]
                 )
                 cnt += 1
             elif "中标（成交）金额" in part[idx] or "中标金额" in part[idx]:
+                handle_title()
                 idx += 1
                 tmp_idx = idx
                 # 某些情况下存在金额 “xxxx.xxx” 会被解析，显示解析后的数目少于 5
@@ -192,6 +223,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                         and index < len(part[idx]) - 1  # 确保小数点后面有字符
                         and part[idx][index + 1].isdigit()  # 小数点后面是数字
                     )
+                    and not check_title()
                 ):
                     idx += 1
 

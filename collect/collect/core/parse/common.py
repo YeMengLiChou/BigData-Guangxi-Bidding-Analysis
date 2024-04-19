@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Union
 
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "filter_texts",
+    "translate_zh_to_number",
     "startswith_chinese_number",
     "startswith_number_index",
     "parse_review_experts",
@@ -48,6 +50,15 @@ chinese_number_mapper = {
 }
 
 chinese_numbers: list = list(chinese_number_mapper.keys())
+
+
+def translate_zh_to_number(text: str) -> int:
+    """
+    返回中文数字对应的阿拉伯数字
+    :param text:
+    :return:
+    """
+    return chinese_number_mapper.get(text, -1)
 
 
 def filter_texts(texts: list, rules=None):
@@ -200,33 +211,34 @@ def parse_review_experts(part: list[str]) -> dict:
 
     for p in persons:
         # 部分去掉句号
-        p = p.replace("。", "")
+        p = p.replace("。", "").replace("：", "").replace(":", "")
         # 判断是否有括号
         l, r = sym.get_parentheses_position(p)
         # 存在括号
         if l != -1 and r != -1:
             # 名字在括号的右边：（xxx）名字
             if l == 0:
-                result = p[r + 1 :]
+                result = p[r + 1:]
             # 名字在括号的左边： 名字（xxx）
             elif r == len(p) - 1:
                 result = p[:l]
             else:
                 raise ParseError(
                     msg="评审专家解析部分出现特殊情况",
-                    content=part.append(f"{p} l:{l}, r:{r}"),
+                    content=persons + [f"{p} l:{l}, r:{r}"],
                 )
+
             # 去掉括号加入到评审小组
             review_experts.append(result)
             # 加入到采购代表人
-            if "采购" in p[l + 1 : r]:
+            if "采购" in p[l + 1: r]:
                 representors.append(result)
         elif l == -1 and r == -1:
             if p == "/":
                 continue
             review_experts.append(p)
         else:
-            raise ParseError(msg="评审专家解析部分出现特殊情况", content=part.append(p))
+            raise ParseError(msg="评审专家解析部分出现特殊情况", content=part + [p])
     return data
 
 
@@ -273,8 +285,12 @@ def parse_bid_item_reason(reason: str) -> int:
     # 1.有效供应商(不足三家)
     # 2.提交投标文件的投标供应商数量(不足三家),本项目废标
     # 3.投标供应商(数量不符合)要求,系统自动废标
-    # 4.通过符合性审查的投标人不足3家，作废标处理。
-    if "不足三家" in reason or "不足3家" in reason or "数量不符合" in reason:
+    # 4.通过符合性审查的投标人(不足3家)，作废标处理。
+    # 5.至投标截止时间，提交投标文件的投标人(少于三家)，本项目流标，由采购人依法重新招标
+    # 6.经公开唱标，B分标无投标人参与投标，该分标采购失败。
+    if (
+            ("三家" in reason or "3家" in reason) and ("不足" in reason or "少于" in reason)
+    ) or ("数量不符合" in reason) or ("无投标人参与" in reason):
         return constants.BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS
 
     # 1. "评标委员会发现招标文件存在歧义，故本次采购活动作废标处理。
@@ -285,18 +301,32 @@ def parse_bid_item_reason(reason: str) -> int:
     if "违法、违规行为" in reason:
         return constants.BID_ITEM_REASON_ILLEGAL
 
-    # 1.  因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
+    # 1. 因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
     if "重新开展采购" in reason:
         return constants.BID_ITEM_REASON_REOPEN
 
     # 1. 因操作失误，评委人数不符合要求，且系统无法修改，导致项目无法评审，因此流标。
-    if "无法评审" in reason:
+    # 2. 无法进行评审
+    if ("无法评审" in reason) or ("无法进行评审" in reason):
         return constants.BID_ITEM_REASON_UNABLE_REVIEW
 
     # 1. 三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
     if "不通过符合性审查" in reason:
         return constants.BID_ITEM_REASON_NOT_PASS_COMPLIANCE_REVIEW
 
+    # 1. 因重大变故，采购任务取消
+    # 2. 因项目重大变故，取消本次采购
+    if ("重大变故" in reason) and ("采购" in reason) and ("取消" in reason):
+        return constants.BID_ITEM_REASON_MAJOR_CHANGES_AND_CANCEL
+
+    # 1. 在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，以此类推
+    # 2. 根据中标候选人推荐原则；在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，如排名
+    if "不能再取得第一中标候选供应商资格" in reason:
+        return constants.BID_ITEM_REASON_SUPPLIERS_ALLOCATION_COMPLETED
+
+    # 1. 三家提供的(软件著作权)证书均与其投标产品(不符)
+    if "软件著作权" in reason and "不符" in reason:
+        return constants.BID_ITEM_REASON_COPYRIGHT_INCONSISTENT
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
 
@@ -312,12 +342,12 @@ def parse_contact_info(part: list[str]) -> dict:
         return startswith_number_index(s) >= 1
 
     def check_name(s: str) -> bool:
-        startswith_name = s.startswith("名") or (s.find("名") < s.find("称"))
+        startswith_name = s.startswith("名称") or (s.find("名") < s.find("称"))
         endswith_colon = s.endswith(":") or s.endswith("：")
         return startswith_name and endswith_colon
 
     def check_address(s: str) -> bool:
-        startswith_address = s.startswith("地") or (s.find("地") < s.find("址"))
+        startswith_address = s.startswith("地址") or (s.find("地") < s.find("址"))
         endswith_colon = s.endswith(":") or s.endswith("：")
         return startswith_address and endswith_colon
 
@@ -374,7 +404,7 @@ def parse_contact_info(part: list[str]) -> dict:
 
 @stats.function_stats(logger)
 def _merge_bid_items(
-    _purchase: list, _result: list, cancel_reason_only_one: bool, data:dict
+        _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
 ) -> list:
     """
     将两部分的标项信息合并
@@ -425,15 +455,15 @@ def _merge_bid_items(
         purchase_index = purchase_item[constants.KEY_BID_ITEM_INDEX]
         # 同一个标项 purchase_item 可能有多个 result_item 对应
         while (
-            r_idx < result_len
-            and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
+                r_idx < result_len
+                and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
         ):
             result_item = _result[r_idx]
             # 标项名称不一致
             if (
-                result_item.get(constants.KEY_BID_ITEM_NAME, None)
-                and purchase_item[constants.KEY_BID_ITEM_NAME]
-                != result_item[constants.KEY_BID_ITEM_NAME]
+                    result_item.get(constants.KEY_BID_ITEM_NAME, None)
+                    and purchase_item[constants.KEY_BID_ITEM_NAME]
+                    != result_item[constants.KEY_BID_ITEM_NAME]
             ):
                 raise ParseError(
                     msg="标项名称不一致",
@@ -523,7 +553,7 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
                 cancel_reason_only_one=data.get(
                     constants.KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE, False
                 ),
-                data=data
+                data=data,
             )
         data.update(purchase_data)
 

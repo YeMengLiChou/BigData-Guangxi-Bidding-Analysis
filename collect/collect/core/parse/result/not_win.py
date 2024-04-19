@@ -89,8 +89,12 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
         # 存在文本分开的情况
         tmp = "".join(part)
+
         # 每个标项都有单独的理由说明
-        if "标项" in tmp or "分标" in tmp:
+        # 拿到关键词
+        if keyword := symbol_tools.get_symbol(tmp, ("标项", "分标", "包"), raise_error=False):
+
+            # TODO: ex: 标项1:三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
             part = tmp.split("。")
             del tmp
             # 存在 "分标1:xxxx;分标2:xxxx;" 这种合并在同一个字符串的情况
@@ -102,6 +106,10 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
             for p in part:
                 if not p:
                     continue
+
+                if keyword not in p:
+                    continue
+
                 # 解析出是第几个标项
                 # 数字分标：分标1:xxxx
                 if match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_NUMBER_INDEX.match(p):

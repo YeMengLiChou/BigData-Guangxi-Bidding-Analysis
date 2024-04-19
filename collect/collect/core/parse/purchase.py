@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Union
 
 from collect.collect.core.error import SwitchError
@@ -16,6 +17,7 @@ class StandardFormatParser(AbstractFormatParser):
     """
     标准格式文件的解析
     """
+    __PATTERN_BIDDING_PREFIX = re.compile(r"标项\S{1,2}")
 
     @staticmethod
     @stats.function_stats(logger)
@@ -57,8 +59,6 @@ class StandardFormatParser(AbstractFormatParser):
                 )
             return item
 
-        # print(part)
-
         data, bid_items = dict(), []
         n, idx = len(part), 0
         bid_item_index = 1
@@ -90,7 +90,8 @@ class StandardFormatParser(AbstractFormatParser):
                 data[constants.KEY_PROJECT_TOTAL_BUDGET] = budget
                 idx += 2
             # 标项解析
-            elif text.startswith("标项") and part[idx + 1].startswith("标项名称"):
+            # elif text.startswith("标项") and part[idx + 1].startswith("标项名称"):
+            elif StandardFormatParser.__PATTERN_BIDDING_PREFIX.fullmatch(text):
                 bid_item = common.get_template_bid_item(
                     is_win=False, index=bid_item_index
                 )
@@ -98,7 +99,7 @@ class StandardFormatParser(AbstractFormatParser):
                 # 标项名称
                 bid_item[constants.KEY_BID_ITEM_NAME] = part[idx]
                 idx += 1
-                while idx < n and not part[idx].startswith("标项名称"):
+                while idx < n and not StandardFormatParser.__PATTERN_BIDDING_PREFIX.fullmatch(part[idx]):
                     # 标项采购数量
                     if check_bid_item_quantity(part[idx]):
                         quantity = part[idx + 1]
