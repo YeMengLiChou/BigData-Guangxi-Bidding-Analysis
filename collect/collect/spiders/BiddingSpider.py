@@ -211,6 +211,14 @@ class BiddingSpider(scrapy.Spider):
         # ==================== 最近的 ========================
         # ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 死循环
         # ("bzHfq7PCKWTHrBHufwfWIQ%3D%3D", True),  # 采购公告存在isExist为True但是api返回的data为None
+        # ("Aqick03HkvP6p/zD8IHU6A==", True),  # 出现新的标项序号
+        # ("OyDFIFvfxl6BjoGP8klhJQ==", True),  # 出现新的金额格式  单项合价（元） ③＝①×②/费率:650000(元) *2
+        # ("4y99t6bWQoaIdhPnt313QQ==", True),  # 出现新的金额格式   每年可行性缺口补助:530000000(元)
+        # ("2ST2nVcVaFIlY4NIeie27g==", True),  # 出现新的中标格式： 中标金额
+        # ("R99B3UWFEqrLF/tksnsgqw==", True), # 出现新的金额格式  价格:13185000(元)
+        # ("QAI+LyiIc1LYJjpYA0omCA==", False),  # 废标理由共用
+        ("JfuMrotn+DZtCSb9lr5l8w==", True),  # 采购标项出现错误
+
     ]
 
     #  =========================================
@@ -437,9 +445,14 @@ class BiddingSpider(scrapy.Spider):
                     articleId=purchase_ids[i], callback=self.parse_purchase, meta=meta
                 )
         else:
-            raise ParseError(
-                f"采购公告没有任何标项信息： {purchase_ids} - {bin(parsed)}"
-            )
+            parsed += 1
+            if (parsed & (-parsed)) != parsed:
+                raise ParseError(
+                    msg="采购公告存在逻辑问题",
+                    content=[bin(parsed)[2:]] + purchase_ids
+                )
+            logger.warning(f"采购公告 {purchase_ids} 没有解析到任何标项信息， 直接生成 item")
+            return common.make_item(data=meta, purchase_data=None)
 
     @stats.function_stats(logger)
     def parse_purchase(self, response: Response):
@@ -450,8 +463,8 @@ class BiddingSpider(scrapy.Spider):
         """
         response_body = json.loads(response.text)
         if response_body.get("success", False):
-            data: dict = response_body["result"]["data"]
             meta: dict = response.meta
+            data: dict = response_body["result"]["data"]
 
             purchase_data = {}
 
@@ -480,6 +493,13 @@ class BiddingSpider(scrapy.Spider):
                 if data is None:
                     logger.warning(f"请注意 {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
                     yield self.switch_other_purchase_announcement
+                    return
+                else:
+                    # 在 2022 前的发布的公告大多格式不统一，直接切换
+                    if data['publishDate'] < 1640966400000:
+                        logger.warning(f"该公告 {get_articleId_from_url(response.url)} 在2022年前发布")
+                        yield self.switch_other_purchase_announcement
+                        return
 
                 # 更新 html 内容
                 purchase_data = purchase.parse_html(html_content=data["content"])
