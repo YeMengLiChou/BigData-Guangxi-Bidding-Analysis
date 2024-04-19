@@ -217,8 +217,9 @@ class BiddingSpider(scrapy.Spider):
         # ("2ST2nVcVaFIlY4NIeie27g==", True),  # 出现新的中标格式： 中标金额
         # ("R99B3UWFEqrLF/tksnsgqw==", True), # 出现新的金额格式  价格:13185000(元)
         # ("QAI+LyiIc1LYJjpYA0omCA==", False),  # 废标理由共用
-        ("JfuMrotn+DZtCSb9lr5l8w==", True),  # 采购标项出现错误
-
+        # ("JfuMrotn+DZtCSb9lr5l8w==", True),  # 采购标项出现错误
+        # ("Zq/T/LwmDS54RA5CZferSw==", False),  # 出现 “流标理由”
+        ("DkCsusC9o1iq9iNtt7jmsw==", False),  # parts 不足
     ]
 
     #  =========================================
@@ -319,8 +320,14 @@ class BiddingSpider(scrapy.Spider):
                     meta[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data[
                         "isGovPurchase"
                     ]
-                    # TODO: 判断是否为中标候选人公示，后期完善
                     title = data["title"]
+
+                    # 公开征集公告省略
+                    if "公开征集" in title:
+                        logger.warning(f"该公告为征集公告，跳过 title: `{title}`")
+                        return
+
+                    # TODO: 判断是否为中标候选人公示，后期完善
                     if title and ("中标候选人" in title):
                         meta[constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE] = True
 
@@ -491,7 +498,7 @@ class BiddingSpider(scrapy.Spider):
 
                 # 某些文章id返回的数据为None，需要预选处理
                 if data is None:
-                    logger.warning(f"请注意 {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
+                    logger.warning(f" {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
                     yield self.switch_other_purchase_announcement
                     return
                 else:
