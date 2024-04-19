@@ -90,11 +90,11 @@ class StandardFormatParser(AbstractFormatParser):
                 data[constants.KEY_PROJECT_TOTAL_BUDGET] = budget
                 idx += 2
             # 标项解析
-            elif text.startswith("标项名称"):
+            elif text.startswith("标项") and part[idx + 1].startswith("标项名称"):
                 bid_item = common.get_template_bid_item(
                     is_win=False, index=bid_item_index
                 )
-                idx += 1
+                idx += 2
                 # 标项名称
                 bid_item[constants.KEY_BID_ITEM_NAME] = part[idx]
                 idx += 1
