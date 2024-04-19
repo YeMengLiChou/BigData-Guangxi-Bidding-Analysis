@@ -33,15 +33,28 @@ def check_item_json(json_data: list):
 
         index += 1
         if not ok:
-            print(f"{index} not ok {item[constant.constants.KEY_PROJECT_RESULT_ARTICLE_ID]}\n\n")
-        else:
-            print(f"{index} ok.\n\n")
+            print(f"{index} not ok {item[constant.constants.KEY_PROJECT_RESULT_ARTICLE_ID]}\n")
 
         government_purchase = item['is_government_purchase']
         if government_purchase:
             print("has")
 
 
+def print_values(json_data: list):
+    keys = [item for item in dir(constant.constants) if item.startswith("KEY_")]
+    project_keys = set(getattr(constant.constants, item) for item in keys if item.startswith("KEY_PROJECT_"))
+    bid_item_keys = set(getattr(constant.constants, item) for item in keys if item.startswith("KEY_BID_ITEM_"))
+
+    for key in project_keys:
+        print(f"---------{key}-------------")
+        for item in json_data:
+            print(f"{item[key]}")
+        print()
+
+
 if __name__ == '__main__':
     with open("../logs/item_debug.json", encoding="utf-8") as f:
-        check_item_json(json.load(f))
+        # check_item_json(json.load(f))
+        data = json.load(f)
+        # check_item_json(data)
+        print_values(data)

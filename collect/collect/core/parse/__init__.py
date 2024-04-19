@@ -17,9 +17,14 @@ logger = logging.getLogger(__name__)
 # 正则表达式预处理，重复使用
 PATTERN_NUMBER_UNIT = re.compile(r"(\d+(\.\d*)?)[(（](\S+)[)）]")
 
-# 格式：  (非数字部分)(可能存在的冒号:)(金额数字)(可能存在的左括号)(非数字部分)(可能存在的右括号)
+# 格式：  (非数字部分)(:)(金额数字)(可能存在的左括号)(非数字部分)(可能存在的右括号)
 PATTERN_DESC_NUMBER_UNIT = re.compile(
-    r"([^0-9]*)[:：]?(\d*(\.\d*)?)[(（]?([^（(0-9)）]+)[)）]?"
+    r"(\S*)[:：](\d*(?:\.\d*)?)[(（]?([^（(0-9)）]+)[)）]?"
+)
+
+# 无冒号
+PATTERN_DESC_NUMBER_UNIT_NO_COMMA = re.compile(
+    r"([^0-9]*)(\d*(?:\.\d*)?)[(（]?([^（(0-9)）]+)[)）]?"
 )
 
 PATTERN_CHINESE_NUMBER = re.compile(r"([^0-9]*)[(（]?[¥￥]?(\d*(\.\d*)?)[)）]?")
@@ -61,9 +66,11 @@ def parse_amount_and_percent(
                 return None, None
 
     # 匹配类型： [文字说明] :/： [金额] (/（[单位])/）
-    elif match := PATTERN_DESC_NUMBER_UNIT.fullmatch(string):
+    elif (match := PATTERN_DESC_NUMBER_UNIT.fullmatch(string)) or (
+        match := PATTERN_DESC_NUMBER_UNIT_NO_COMMA.fullmatch(string)
+    ):
         # 前缀描述，金额数字，小数位，单位
-        desc, amount_text, _, unit = match.groups()
+        desc, amount_text, unit = match.groups()
         parsed = True
 
         # 服务总报价、竞标总报价、响应总报价、总价、最终评审价、最后报价、最终报价、投标总价、磋商总报价、投标总报价、单价报价合计、总价大写、金额
@@ -73,11 +80,15 @@ def parse_amount_and_percent(
             amount, is_percent = float(amount_text), False
             if check_substrings_in_string(desc, substrings=("系数", "率")):
                 is_percent = True
+            if unit == "%":
+                is_percent = True
 
         # 报价、报价大写、投标报价、响应报价、竞标报价、磋商报价、
         elif check_substrings_in_string(desc, substrings=("报价",)):
             amount, is_percent = float(amount_text), False
             if check_substrings_in_string(desc, substrings=("系数", "率")):
+                is_percent = True
+            if unit == "%":
                 is_percent = True
 
         # 检查是否为折扣系数关键词
@@ -95,7 +106,7 @@ def parse_amount_and_percent(
         # 2. 优惠率：（基准价-中标价）/基准价
         elif check_substrings_in_string(desc, substrings=("下浮", "优惠率", "让利")):
             amount, is_percent = float(amount_text), True
-            amount = float(calculate.decimal_subtract("100", str(100 + amount)))
+            amount = float(calculate.decimal_subtract("100", str(amount)))
 
         else:
             # 出现其他内容，而且是带有百分比的，一致认为是折扣计算
@@ -235,9 +246,53 @@ class AbstractFormatParser:
 
 
 if __name__ == "__main__":
-    text = ""
+    # 测试样例
+    text = [
+        "报价:795000(元),报价大写:795000(元)",
+        "单价:677900(元),投标报价:677900(元)",
+        "服务总报价:3635100(元)",
+        "响应报价:449950(元)",
+        "单位及数量:3(个),金额:2368000(元)",
+        "竞标报价:1710000(元)",
+        "竞标总报价:1484000(元)",
+        "让利系数:1.1(%)",
+        "最后报价:166800.00(元)",
+        "首次报价:690000.00(元),最终评审价:690000.00(元)",
+        "报价:718000(元),供货期/服务项目负责人:1(个)",
+        "响应总报价:631800(元)",
+        "投标综合优惠率:3(%)",
+        "报价:2286678.02(元),供货期/服务项目负责人:180(元) ",
+        "首次报价:1920000.00(元),最终报价:1140000.00(元)",
+        "总价:272571.84(元)",
+        "报价:1355348.8(元),保证金缴纳方式:10000(元)",
+        "单价 ②:3995000(元),投标报价 ③=①×②:3995000(元)",
+        "投标总价:668000(元)",
+        "磋商总报价:708924.10(元)",
+        "磋商报价:811000.00(元)",
+        "报价:828654.75(元),货物名称:828654.75(元),数量:1(个)",
+        "投标折扣:63(%)",
+        "投标总报价（实洋）:2587575.20(元),码洋报价（元）:3234469.00(元),折扣率:80(%)",
+        "响应报价（小写）:1692500(元)",
+        "报价:1355326.48(元),供货期/服务项目负责人:150(元),保证金缴纳方式:0(元),确认声明书是否签署:0(元),备注:0(元)",
+        "新车自主定价系数报价 (总价、%):65(%),旧车自主定价系数报价 (总价、%):65(%)",
+        "报价:3539717.63(元),工期:30(元)",
+        "办公用品类:100(%),被服类:100(%),家具类:100(%),日杂用品类:100(%),五金配件类:100(%)",
+        "首次报价:647800(元),最终报价:647800(元)",
+        "折扣系数:75(%)",
+        "设计费费率报价:2.2(%)",
+        "报价:1069865.50(元),合同履约期限:90(元)",
+        "报价:418018.56(元),工期:60(元),项目经理:0(元),证书编号:0(元)",
+        "单价报价合计:1205(元)",
+        "报价:632100(元),报价大写:632100(元)",
+        "零配件优惠率:10(%),工时费优惠率:10(%),轮胎价格优惠率:10(%)",
+        "总价大写（￥ ）:912904.98(元)",
+        "报价:1341500(元),报价（大写）:1341500(元)",
+        "壹亿肆仟叁佰肆拾叁万零壹佰捌拾贰元叁角陆分(￥143430182.36)",
+        "社会资本方投资项目全投资年合理利润率（税前）7.50%",
+        "投标总报价（单价×127400×12）:1116024.00(元)"
+    ]
     logging.basicConfig()
-    for p in text.split("\n"):
+    for p in text:
         print(p)
         try:
             print(AbstractFormatParser.parse_win_bid_item_amount(p))

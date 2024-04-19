@@ -60,7 +60,7 @@ class ParseError(Exception):
             result = "win"
         else:
             result = "not win"
-        content = '\n'.join(self.content)
+        content = json.dumps(self.content, ensure_ascii=False)
         return (
             f"ParseError(\n"
             f"\tmsg: {self.message}\n"
@@ -70,7 +70,7 @@ class ParseError(Exception):
             f"\tall_article_ids: {self.article_ids}\n"
             f"\ttimestamp: {time.dateformat(self.timestamp)}\n"
             f"\terror: {'None' if not self.error else self.error.__repr__()}\n"
-            f"\tcontent: {self.content}"
+            f"\tcontent: {content}"
         )
 
     __repr__ = __str__

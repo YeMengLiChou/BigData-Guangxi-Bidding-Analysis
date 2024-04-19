@@ -60,6 +60,11 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
 
 
 class NotWinBidStandardFormatParser(AbstractFormatParser):
+    # 数字序号
+    __PATTERN_BID_ITEM_NUMBER_INDEX = re.compile(r"(?:分标|标项|包)(\d+)[:：]?(.*)")
+    # 字母序号"
+    __PATTERN_BID_ITEM_CHARACTER_INDEX = re.compile(r"([A-Z])(?:分标|标项)[:：]?(.*)")
+
     @staticmethod
     @stats.function_stats(logger)
     def parse_review_expert(part: list[str]) -> dict:
@@ -100,11 +105,11 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                     continue
                 # 解析出是第几个标项
                 # 数字分标：分标1:xxxx
-                if match := re.match(r"(?:分标|标项|包)(\d+)[:：]?(.*)", p):
+                if match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_NUMBER_INDEX.match(p):
                     index, reason = match.group(1), match.group(2)
 
                 # 字母分标：A分标:xxxx
-                elif match := re.match(r"([A-Z])(?:分标|标项)[:：]?(.*)", p):
+                elif match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_CHARACTER_INDEX.match(p):
                     index, reason = match.group(1), match.group(2)
                     # 将其转化为 数字
                     index = ord(index) - ord("A") + 1

@@ -167,15 +167,30 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             elif "中标（成交）金额" in part[idx]:
                 idx += 1
                 tmp_idx = idx
-                while idx < n and common.startswith_number_index(part[idx]) == -1:
+                # 某些情况下存在金额 “xxxx.xxx” 会被解析，显示解析后的数目少于 5
+
+                while idx < n and (
+                    common.startswith_number_index(part[idx]) == -1  # 不以 '数字.' 开头
+                    or (
+                        (index := part[idx].find(".")) != -1  # 某些情况存在为小数开头，先找到小数点位置 index
+                        and index < len(part[idx]) - 1  # 确保小数点后面有字符
+                        and part[idx][index + 1].isdigit()  # 小数点后面是数字
+                    )
+                ):
                     idx += 1
+
                 amount_text = "".join(part[tmp_idx:idx])
                 amount, is_percent = AbstractFormatParser.parse_win_bid_item_amount(
                     amount_str=amount_text
                 )
                 item[constants.KEY_BID_ITEM_AMOUNT] = amount
                 item[constants.KEY_BID_ITEM_IS_PERCENT] = is_percent
+                cnt += 1
+            else:
+                idx += 1
 
+        if cnt != 3:
+            raise ParseError(msg="出现特殊的中标信息格式", content=part)
         data.append(item)
         return data
 

@@ -25,9 +25,19 @@ from constant import constants
 logger = logging.getLogger(__name__)
 
 
+def get_articleId_from_url(url: str) -> str:
+    """
+    从 url 中解析出 articleId
+    :param url:
+    :return:
+    """
+    params = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+    return params["articleId"][0]
+
+
 @stats.function_stats(logger)
 def _make_result_request(
-    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
+        pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
 ):
     """
     生成结果列表的请求
@@ -198,6 +208,9 @@ class BiddingSpider(scrapy.Spider):
         # ("HKor1SEeN02slN/XvtayYg==", False),  # 看是废标实际上是终止
         # ("Sfb/HdmkZ9wKtTvcGOIfjQ==", False),  # 需要切换采购公告
         # ("6OPa2XaYAImxu/6nudSv+g==", True),  # 需要切换采购公告
+        # ==================== 最近的 ========================
+        # ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 死循环
+        ("bzHfq7PCKWTHrBHufwfWIQ%3D%3D", True),  # 采购公告存在isExist为True但是api返回的data为None
     ]
 
     #  =========================================
@@ -440,28 +453,35 @@ class BiddingSpider(scrapy.Spider):
             data: dict = response_body["result"]["data"]
             meta: dict = response.meta
 
-            # 首先判断是不是第一次解析采购公告
-            if constants.KEY_DEV_START_PURCHASE_ARTICLE_ID not in meta:
-                # 当前公告id
-                current_id = data["articleId"]
-                meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID] = current_id
-                # 定位解析位置
-                purchase_ids: list = meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID]
-                index = purchase_ids.index(current_id)
-                parsed = 1 << index
-                # 标记当前位置
-                meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
-            else:
-                print(meta)
-                parsed = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
-                purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
-                index = purchase_ids.index(data["articleId"])
-                parsed |= 1 << index
-                meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
-
-            # TODO: 可能存在多个采购公告，考虑 SwitchError
-            purchase_data = {}
             try:
+
+                # 首先判断是不是第一次解析采购公告
+                if constants.KEY_DEV_START_PURCHASE_ARTICLE_ID not in meta:
+                    # 当前公告id
+                    current_id = get_articleId_from_url(response.url)
+                    meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID] = current_id
+                    # 定位解析位置
+                    purchase_ids: list = meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID]
+                    index = purchase_ids.index(current_id)
+                    parsed = 1 << index
+                    # 标记当前位置
+                    meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
+                else:
+                    # 当前公告id
+                    current_id = get_articleId_from_url(response.url)
+                    parsed = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
+                    purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+                    index = purchase_ids.index(current_id)
+                    parsed |= 1 << index
+                    meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
+
+                # 某些文章id返回的数据为None，需要预选处理
+                if data is None:
+                    logger.warning(f"请注意 {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
+                    yield self.switch_other_purchase_announcement
+
+                purchase_data = {}
+
                 # 更新 html 内容
                 purchase_data = purchase.parse_html(html_content=data["content"])
 

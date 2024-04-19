@@ -4,6 +4,8 @@ from typing import Union, TextIO
 from scrapy import signals
 from scrapy.crawler import Crawler
 
+import constant.constants
+
 
 class DebugPipeline:
     """
