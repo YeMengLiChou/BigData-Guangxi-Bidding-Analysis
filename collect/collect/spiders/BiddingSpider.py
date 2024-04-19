@@ -61,7 +61,7 @@ def _make_result_request(
             pageSize=pageSize,
             categoryCode="ZcyAnnouncement2",
             publishDateBegin="2022-01-01",
-            publishDateEnd="2022-01-04",
+            publishDateEnd="2022-01-31",
         ),
         headers={"Content-Type": "application/json;charset=UTF-8"},
         dont_filter=dont_filter,
@@ -210,7 +210,7 @@ class BiddingSpider(scrapy.Spider):
         # ("6OPa2XaYAImxu/6nudSv+g==", True),  # 需要切换采购公告
         # ==================== 最近的 ========================
         # ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 死循环
-        ("bzHfq7PCKWTHrBHufwfWIQ%3D%3D", True),  # 采购公告存在isExist为True但是api返回的data为None
+        # ("bzHfq7PCKWTHrBHufwfWIQ%3D%3D", True),  # 采购公告存在isExist为True但是api返回的data为None
     ]
 
     #  =========================================
@@ -453,8 +453,9 @@ class BiddingSpider(scrapy.Spider):
             data: dict = response_body["result"]["data"]
             meta: dict = response.meta
 
-            try:
+            purchase_data = {}
 
+            try:
                 # 首先判断是不是第一次解析采购公告
                 if constants.KEY_DEV_START_PURCHASE_ARTICLE_ID not in meta:
                     # 当前公告id
@@ -479,8 +480,6 @@ class BiddingSpider(scrapy.Spider):
                 if data is None:
                     logger.warning(f"请注意 {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
                     yield self.switch_other_purchase_announcement
-
-                purchase_data = {}
 
                 # 更新 html 内容
                 purchase_data = purchase.parse_html(html_content=data["content"])
