@@ -76,7 +76,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         return common.parse_review_experts(part)
 
     @staticmethod
-    @stats.function_stats(logger)
+    @stats.function_stats(logger, log_params=True)
     def parse_cancel_reason(part: list[str]) -> dict:
         """
         解析 废标理由 部分
@@ -89,7 +89,6 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
         # 存在文本分开的情况
         tmp = "".join(part)
-        logger.warning(tmp)
         # 每个标项都有单独的理由说明
         if "标项" in tmp or "分标" in tmp:
             part = tmp.split("。")

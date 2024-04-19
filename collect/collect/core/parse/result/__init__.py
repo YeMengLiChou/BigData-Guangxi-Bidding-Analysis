@@ -173,6 +173,12 @@ def parse_html(html_content: str, is_win_bid: bool):
                             # 拼接
                             result[idx] = ''.join(result[tmp_idx: idx + 1])
 
+                # 存在一种情况，“中文数字、”和后面的标题内容分开，也就是 '、' 是最后一个字符
+                if result[idx][-1] == '、':
+                    result[idx] += result[idx + 1]
+                    result.pop(idx + 1)
+                    n -= 1
+
                 key_part = check_useful_part(is_win=is_win_bid, title=result[idx])
                 # 该部分为所需要的标题信息
                 if key_part:
@@ -180,8 +186,11 @@ def parse_html(html_content: str, is_win_bid: bool):
 
                     # 某些标题可能和后面的内容连成一块，需要分开
                     if sym := symbol_tools.get_symbol(result[idx], (":", "："), raise_error=False):
-                        result.insert(idx + 1, result[idx][result[idx].index(sym) + 1:])
-                        n = len(result)
+                        sym_idx = result[idx].index(sym)
+                        # 如果冒号不是最后一个字符
+                        if sym_idx < len(result[idx]) - 1:
+                            result.insert(idx + 1, result[idx][sym_idx + 1:])
+                            n += 1
 
                     # 项目编号从 purchase 移动到此处
                     if key_part == constants.KEY_PART_PROJECT_CODE:
