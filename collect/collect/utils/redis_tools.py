@@ -61,7 +61,14 @@ def get_latest_announcement_timestamp(
     - 如果 ``parse_to_str`` 为 False，返回毫秒级字符串
     - 当 redis 中没有对应的时间戳时，返回 None
     """
-    timestamp = int(_client.get(KEY_ANNOUNCEMENT_LATEST_TIMESTAMP))
+    # 先从 redis 拿到数据
+    latest_timestamp = _client.get(KEY_ANNOUNCEMENT_LATEST_TIMESTAMP)
+    # 从 str 转成 int
+    if latest_timestamp:
+        timestamp = int(str(latest_timestamp))
+    else:
+        timestamp = None
+    # 转成 字符串 格式
     if timestamp and parse_to_str:
         return parse_timestamp(int(timestamp))
     return timestamp
