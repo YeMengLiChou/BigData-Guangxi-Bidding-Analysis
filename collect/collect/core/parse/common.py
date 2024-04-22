@@ -1,11 +1,11 @@
-import json
 import logging
+import re
 from typing import Union
+
+from lxml import etree
 
 from collect.collect.middlewares import ParseError
 from collect.collect.utils import symbol_tools as sym, debug_stats as stats
-from lxml import etree
-
 from constant import constants
 
 logger = logging.getLogger(__name__)
@@ -174,7 +174,7 @@ def check_unuseful_announcement(announcement_type: int) -> bool:
 def parse_review_experts(part: list[str]) -> dict:
     """
     通用的 “评审小组” 部分解析
-    :param part: 返回包含 `constants.KEY_PROJECT_PURCHASE_REPRESENTOR` 和 `constants.KEY_PROJECT_REVIEW_EXPERT` 的dict（不为空）
+    :param part: 返回包含 `constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE` 和 `constants.KEY_PROJECT_REVIEW_EXPERT` 的dict（不为空）
     :return:
     """
     data = dict()
@@ -193,7 +193,7 @@ def parse_review_experts(part: list[str]) -> dict:
     data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
     # 采购代表人
     representors = []
-    data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = representors
+    data[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = representors
 
     # 存在分隔符
     if len(counter) != 0:
@@ -330,75 +330,34 @@ def parse_bid_item_reason(reason: str) -> int:
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
 
+PATTERN_PURCHASER = re.compile(r"采购人(?:信息|)名称[:：](\S+?)(?:地址|联系人)")
+
+PATTERN_PURCHASER_AGENCY = re.compile(r"采购代理机构(?:信息|)名称[：:](\S+?)(?:地址|联系人)")
+
+
 @stats.function_stats(logger)
-def parse_contact_info(part: list[str]) -> dict:
+def parse_contact_info(part: str) -> dict:
     """
     解析 以下方式联系 部分
     :param part:
     :return:
     """
+    part = part.replace(" ", "").replace(" ", "").replace("\u3000", "")
 
-    def check_information_begin(s: str) -> bool:
-        return startswith_number_index(s) >= 1
+    data = dict()
+    if match := PATTERN_PURCHASER.search(part):
+        data[constants.KEY_PURCHASER] = match.group(1)
+    else:
+        data[constants.KEY_PURCHASER] = None
 
-    def check_name(s: str) -> bool:
-        startswith_name = s.startswith("名称") or (s.find("名") < s.find("称"))
-        endswith_colon = s.endswith(":") or s.endswith("：")
-        return startswith_name and endswith_colon
+    if match := PATTERN_PURCHASER_AGENCY.search(part):
+        data[constants.KEY_PURCHASER_AGENCY] = match.group(1)
+    else:
+        data[constants.KEY_PURCHASER_AGENCY] = None
 
-    def check_address(s: str) -> bool:
-        startswith_address = s.startswith("地址") or (s.find("地") < s.find("址"))
-        endswith_colon = s.endswith(":") or s.endswith("：")
-        return startswith_address and endswith_colon
-
-    def check_person(s: str) -> bool:
-        startswith_person = s.startswith("项目联系人") or s.startswith("联系人")
-        endswith_colon = s.endswith(":") or s.endswith("：")
-        return startswith_person and endswith_colon
-
-    def check_contact_method(s: str) -> bool:
-        startswith_contact_method = s.startswith("项目联系方式") or s.startswith(
-            "联系方式"
-        )
-        endswith_colon = s.endswith(":") or s.endswith("：")
-        return startswith_contact_method and endswith_colon
-
-    data, n, idx = dict(), len(part), 0
-    while idx < n:
-        text = part[idx]
-        if check_information_begin(text):
-            # 采购人 / 采购代理机构信息
-            key_word = text[2:]
-            idx += 1
-            info = dict()
-            # 开始解析内容
-            while idx < n and not check_information_begin(part[idx]):
-                # 名称
-                if check_name(part[idx]):
-                    info["name"] = part[idx + 1]
-                    idx += 2
-                # 地址
-                elif check_address(part[idx]):
-                    info["address"] = part[idx + 1]
-                    idx += 2
-                # 联系人
-                elif check_person(part[idx]):
-                    info["person"] = part[idx + 1].split("、")
-                    idx += 2
-                # 联系方式
-                elif check_contact_method(part[idx]):
-                    info["contact_method"] = part[idx + 1]
-                    idx += 2
-                else:
-                    idx += 1
-
-            # 加入到 data 中
-            if key_word.startswith("采购人"):
-                data[constants.KEY_PURCHASER_INFORMATION] = info
-            elif key_word.startswith("采购代理机构"):
-                data[constants.KEY_PURCHASER_AGENCY_INFORMATION] = info
-        else:
-            idx += 1
+    logger.warning(f'{data[constants.KEY_PURCHASER]}  |  {data[constants.KEY_PURCHASER_AGENCY]}')
+    if data[constants.KEY_PURCHASER] is None or data[constants.KEY_PURCHASER_AGENCY] is None:
+        raise ParseError(msg='出现新的联系方式内容', content=[part])
     return data
 
 
@@ -594,10 +553,7 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     item[constants.KEY_PROJECT_RESULT_PUBLISH_DATE] = data.get(
         constants.KEY_PROJECT_RESULT_PUBLISH_DATE, []
     )
-    # 是否政府采购 TODO:此数据似乎都是false， 需要进一步确认
-    item[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data.get(
-        constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE, None
-    )
+
     # 采购公告ids
     item[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = data.get(
         constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, []
@@ -643,20 +599,20 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     )
 
     # 采购方信息
-    item[constants.KEY_PURCHASER_INFORMATION] = data.get(
-        constants.KEY_PURCHASER_INFORMATION, None
+    item[constants.KEY_PURCHASER] = data.get(
+        constants.KEY_PURCHASER, None
     )
     # 采购方机构信息
-    item[constants.KEY_PURCHASER_AGENCY_INFORMATION] = data.get(
-        constants.KEY_PURCHASER_AGENCY_INFORMATION, None
+    item[constants.KEY_PURCHASER_AGENCY] = data.get(
+        constants.KEY_PURCHASER_AGENCY, None
     )
     # 审查专家信息
     item[constants.KEY_PROJECT_REVIEW_EXPERT] = data.get(
         constants.KEY_PROJECT_REVIEW_EXPERT, []
     )
     # 采购代表人信息
-    item[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = data.get(
-        constants.KEY_PROJECT_PURCHASE_REPRESENTOR, []
+    item[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = data.get(
+        constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE, []
     )
     # 是否终止
     item[constants.KEY_PROJECT_IS_TERMINATION] = data.get(

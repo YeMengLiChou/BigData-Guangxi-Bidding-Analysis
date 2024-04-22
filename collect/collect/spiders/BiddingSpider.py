@@ -319,9 +319,6 @@ class BiddingSpider(scrapy.Spider):
                 if data:
                     meta[constants.KEY_PROJECT_CODE] = data["projectCode"]
                     meta[constants.KEY_PROJECT_NAME] = data["projectName"]
-                    meta[constants.KEY_PROJECT_IS_GOVERNMENT_PURCHASE] = data[
-                        "isGovPurchase"
-                    ]
                     title = data["title"]
 
                     # 公开征集公告省略

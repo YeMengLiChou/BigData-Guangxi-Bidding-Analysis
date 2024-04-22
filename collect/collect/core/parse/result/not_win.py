@@ -20,7 +20,7 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
     data = dict()
     # 解析 联系方式
     if constants.KEY_PART_CONTACT in parts:
-        data.update(common.parse_contact_info(parts[constants.KEY_PART_CONTACT]))
+        data.update(common.parse_contact_info("".join(parts[constants.KEY_PART_CONTACT])))
     # 解析 评审专家
     if constants.KEY_PART_REVIEW_EXPERT in parts:
         data.update(
@@ -48,7 +48,7 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
     # 如果没有对应的数据，那么就赋值默认值
     if not data.get(constants.KEY_PROJECT_REVIEW_EXPERT, None):
         data[constants.KEY_PROJECT_REVIEW_EXPERT] = []
-        data[constants.KEY_PROJECT_PURCHASE_REPRESENTOR] = []
+        data[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = []
 
     # 如果不是结果公告 或者 没有对应的数据，那么赋默认值
     if (not data.get(constants.KEY_PROJECT_IS_TERMINATION, False)) or (

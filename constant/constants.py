@@ -31,6 +31,7 @@ BID_ITEM_AMOUNT_UNASSIGNED = -2
 """
 
 BID_ITEM_BUDGET_UNASSIGNED = -1
+
 """
 标项-预算还未赋值（初始化ing）
 """
@@ -186,11 +187,6 @@ KEY_PROJECT_BID_ITEMS = "bid_items"
 项目-所有标项
 """
 
-KEY_PROJECT_IS_GOVERNMENT_PURCHASE = "is_government_purchase"
-"""
-项目-是否为项目采购 
-"""
-
 KEY_PROJECT_DISTRICT_CODE = "district_code"
 """
 项目-项目所在行政区划代码
@@ -246,7 +242,7 @@ KEY_PROJECT_TENDER_DURATION = "tender_duration"
 项目-持续时间：从最开始的公告发布开始（一般是意见或采购），到最后的公告结束（一般是合同）
 """
 
-KEY_PROJECT_PURCHASE_REPRESENTOR = "purchase_representor"
+KEY_PROJECT_PURCHASE_REPRESENTATIVE = "purchase_representative"
 """
 项目-采购代表人
 """
@@ -266,24 +262,14 @@ KEY_PROJECT_TERMINATION_REASON = "termination_reason"
 项目-终止原因
 """
 
-KEY_PURCHASER_INFORMATION = "purchaser_information"
+KEY_PURCHASER = "purchaser"
 """
 联系-采购人信息
 """
 
-KEY_PURCHASER_AGENCY_INFORMATION = "purchasing_agency_information"
+KEY_PURCHASER_AGENCY= "purchasing_agency"
 """
 联系-采购代理机构信息
-"""
-
-KEY_CONTACT_NAME = "name"
-"""
-联系-采购人/采购代理机构名称
-"""
-
-KEY_CONTACT_ADDRESS = "address"
-"""
-联系-采购人/采购代理机构地址
 """
 
 KEY_BID_ITEM_QUANTITY = "quantity"

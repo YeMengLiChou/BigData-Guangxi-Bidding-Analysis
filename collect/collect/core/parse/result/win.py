@@ -16,7 +16,7 @@ def parse_win_bid(parts: dict[int, list[str]]) -> dict:
     """
     解析 中标结果
     :param parts:
-    :return: 返回包含 `KEY_PROJECT_BID_ITEMS`、 `KEY_PROJECT_REVIEW_EXPERT` 和 `KEY_PROJECT_PURCHASE_REPRESENTOR` 的数据
+    :return: 返回包含 `KEY_PROJECT_BID_ITEMS`、 `KEY_PROJECT_REVIEW_EXPERT` 和 `KEY_PROJECT_PURCHASE_REPRESENTATIVE` 的数据
     """
 
     data = dict()
@@ -39,7 +39,7 @@ def parse_win_bid(parts: dict[int, list[str]]) -> dict:
         )
     # 解析 联系方式信息
     if constants.KEY_PART_CONTACT in parts:
-        data.update(common.parse_contact_info(part=parts[constants.KEY_PART_CONTACT]))
+        data.update(common.parse_contact_info(part="".join(parts[constants.KEY_PART_CONTACT])))
 
     return data
 
@@ -179,7 +179,6 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             将连在一起的内容分离
             :return:
             """
-            logger.warning(part[idx])
             if not symbol_tools.endswith_colon_symbol(part[idx]):
                 colon_idx = part[idx].find("：")
                 if colon_idx == -1:

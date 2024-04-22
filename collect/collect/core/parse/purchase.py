@@ -124,7 +124,7 @@ class StandardFormatParser(AbstractFormatParser):
     @staticmethod
     @stats.function_stats(logger)
     def parse_project_contact(part: list[str]) -> dict:
-        return common.parse_contact_info(part)
+        return common.parse_contact_info("".join(part))
 
 
 def check_useful_part(title: str) -> Union[int, None]:

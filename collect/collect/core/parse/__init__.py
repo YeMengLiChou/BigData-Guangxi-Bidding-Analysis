@@ -33,6 +33,7 @@ PATTERN_CHINESE_NUMBER = re.compile(r"([^0-9]*)[(（]?[¥￥]?(\d*(\.\d*)?)[)）
 # 同PATTERN_DESC_NUMBER_UNIT， 但是单位为元
 PATTERN_DESC_NUMBER_YUAN_UNIT = re.compile(r"(\S*)[:：](\d*(?:\.\d*)?)[(（](元)[)）]")
 
+
 def check_substrings_in_string(string: str, substrings: Iterable[str]) -> bool:
     """
     检查字符串是否包含子字符串
@@ -47,7 +48,7 @@ def check_substrings_in_string(string: str, substrings: Iterable[str]) -> bool:
 
 
 def parse_amount_and_percent(
-    string: str, raise_error: bool = True
+        string: str, raise_error: bool = True
 ) -> tuple[Union[float, None], Union[bool, None], bool]:
     """
     解析金额和百分比
@@ -70,7 +71,7 @@ def parse_amount_and_percent(
 
     # 匹配类型： [文字说明] :/： [金额] (/（[单位])/）
     elif (match := PATTERN_DESC_NUMBER_UNIT.fullmatch(string)) or (
-        match := PATTERN_DESC_NUMBER_UNIT_NO_COMMA.fullmatch(string)
+            match := PATTERN_DESC_NUMBER_UNIT_NO_COMMA.fullmatch(string)
     ):
         # 前缀描述，金额数字，小数位，单位
         desc, amount_text, unit = match.groups()
@@ -78,7 +79,7 @@ def parse_amount_and_percent(
 
         # 服务总报价、竞标总报价、响应总报价、总价、最终评审价、最后报价、最终报价、投标总价、磋商总报价、投标总报价、单价报价合计、总价大写、金额
         if check_substrings_in_string(
-            desc, substrings=("总价", "总报价", "最终", "最后", "合计", "金额", "合价")
+                desc, substrings=("总价", "总报价", "最终", "最后", "合计", "金额", "合价")
         ):
             amount, is_percent = float(amount_text), False
             if check_substrings_in_string(desc, substrings=("系数", "率")):
