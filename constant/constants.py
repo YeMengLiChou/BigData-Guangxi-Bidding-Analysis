@@ -1,24 +1,6 @@
 # 存放 KEY 的常量
-#
-#
-
 
 # ===================== Constants Value =====================
-
-BID_ITEM_QUANTITY_UNLIMITED = -1
-"""
-标项-数量没有限制，关键字：不限
-"""
-
-BID_ITEM_QUANTITY_UNCLEAR = 0
-"""
-标项-数量不明确
-"""
-
-BID_ITEM_QUANTITY_NOT_DEAL = -2
-"""
-标项-数量没有成交，即废标
-"""
 
 BID_ITEM_AMOUNT_NOT_DEAL = -1
 """
@@ -111,6 +93,15 @@ BID_ITEM_REASON_COPYRIGHT_INCONSISTENT = 9
 ex:
 1. 三家提供的软件著作权证书均与其投标产品不符
 """
+
+BID_ITEM_REASON_PROCUREMENT_TERMINATION = 10
+"""
+标项-废标理由：终止采购
+ex:
+1. 本项目应采购人要求，经政府采购监督管理部门同意，终止此次采购。
+
+"""
+
 
 
 PROJECT_AMOUNT_UNASSIGNED = -1
@@ -272,11 +263,6 @@ KEY_PURCHASER_AGENCY= "purchasing_agency"
 联系-采购代理机构信息
 """
 
-KEY_BID_ITEM_QUANTITY = "quantity"
-"""
-标项-数量
-"""
-
 KEY_BID_ITEM_INDEX = "index"
 """
 标项-序号
@@ -354,6 +340,16 @@ KEY_DEV_RESULT_CONTAINS_CANDIDATE = "contains_result_candidate"
 中标结果存在候选人公告
 """
 
+KEY_DEV_DEBUG_WRITE = "debug_write"
+"""
+将该部分内容写入文件的标志
+"""
+
+KEY_TEMP_BASE_INFO = "tmp_base_info"
+"""
+调试用：项目基本情况的内容
+"""
+
 # ========================= part key =====================
 KEY_PART_PROJECT_CODE = 0
 """
@@ -394,3 +390,5 @@ KEY_PART_PROJECT_SITUATION = 7
 """
 表示项目基本情况的part
 """
+
+

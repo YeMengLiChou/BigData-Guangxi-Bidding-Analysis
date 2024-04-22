@@ -63,6 +63,7 @@ ITEM_PIPELINES = {
     "collect.pipelines.CollectKafkaPipeline": 300,
     "collect.pipelines.DebugPipeline": 200,
     # "collect.pipelines.UpdateRedisInfoPipeline": 200,
+    # "collect.pipelines.DebugWritePipeline": 100,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -90,6 +91,10 @@ ITEM_PIPELINES = {
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
+
+
+# 内存调试，显示内存使用情况
+MEMDEBUG_ENABLED = True
 
 # ======== ResponseDebugMiddleware =================
 # 是否设置 ResponseDebugMiddleware 的调试

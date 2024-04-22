@@ -243,14 +243,14 @@ def parse_review_experts(part: list[str]) -> dict:
 
 
 @stats.function_stats(logger)
-def get_template_bid_item(is_win: bool, index: int) -> dict:
+def get_template_bid_item(is_win: bool, index: int, name: str = None) -> dict:
     """
     获取一个模板的投标信息，只需要关注已经拿到的值并赋值即可，而无需其他的初始化操作，保证到最后合并的时候都是完整的
     :return:
     """
     return {
         # 名称
-        constants.KEY_BID_ITEM_NAME: None,
+        constants.KEY_BID_ITEM_NAME: name,
         # 序号
         constants.KEY_BID_ITEM_INDEX: index,
         # 是否中标
@@ -265,8 +265,6 @@ def get_template_bid_item(is_win: bool, index: int) -> dict:
         ),
         # 中标金额是否为百分比
         constants.KEY_BID_ITEM_IS_PERCENT: False,
-        # 数量
-        constants.KEY_BID_ITEM_QUANTITY: constants.BID_ITEM_QUANTITY_UNCLEAR,
         # 供应商
         constants.KEY_BID_ITEM_SUPPLIER: None,
         # 供应商地址
@@ -314,9 +312,10 @@ def parse_bid_item_reason(reason: str) -> int:
     if "不通过符合性审查" in reason:
         return constants.BID_ITEM_REASON_NOT_PASS_COMPLIANCE_REVIEW
 
-    # 1. 因重大变故，采购任务取消
-    # 2. 因项目重大变故，取消本次采购
-    if ("重大变故" in reason) and ("采购" in reason) and ("取消" in reason):
+    # 1. 因(重大变故)，(采购)任务(取消)
+    # 2. 因项目(重大变故)，(取消)本次(采购)
+    # 3. 因项目有(重大变更)，故本项目(终止采购)。
+    if ("重大变故" in reason or "重大表更") and ("采购" in reason) and ("取消" in reason or "终止" in reason):
         return constants.BID_ITEM_REASON_MAJOR_CHANGES_AND_CANCEL
 
     # 1. 在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，以此类推
@@ -327,6 +326,10 @@ def parse_bid_item_reason(reason: str) -> int:
     # 1. 三家提供的(软件著作权)证书均与其投标产品(不符)
     if "软件著作权" in reason and "不符" in reason:
         return constants.BID_ITEM_REASON_COPYRIGHT_INCONSISTENT
+
+    # 1. 本项目应采购人要求，经政府采购监督管理部门同意，终止此次(采购)。
+    if "终止此次采购" in reason:
+        return constants.BID_ITEM_REASON_PROCUREMENT_TERMINATION
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
 
@@ -342,7 +345,13 @@ def parse_contact_info(part: str) -> dict:
     :param part:
     :return:
     """
-    part = part.replace(" ", "").replace(" ", "").replace("\u3000", "")
+    # 替换掉无用字符，避免干扰正则表达式
+    part = (
+        part
+        .replace(" ", "")
+        .replace(" ", "")
+        .replace("\u3000", "")
+    )
 
     data = dict()
     if match := PATTERN_PURCHASER.search(part):
@@ -355,7 +364,6 @@ def parse_contact_info(part: str) -> dict:
     else:
         data[constants.KEY_PURCHASER_AGENCY] = None
 
-    logger.warning(f'{data[constants.KEY_PURCHASER]}  |  {data[constants.KEY_PURCHASER_AGENCY]}')
     if data[constants.KEY_PURCHASER] is None or data[constants.KEY_PURCHASER_AGENCY] is None:
         raise ParseError(msg='出现新的联系方式内容', content=[part])
     return data
@@ -433,10 +441,6 @@ def _merge_bid_items(
             # 标项名称
             result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
                 constants.KEY_BID_ITEM_NAME
-            ]
-            # 标项数量
-            result_item[constants.KEY_BID_ITEM_QUANTITY] = purchase_item[
-                constants.KEY_BID_ITEM_QUANTITY
             ]
             # 标项预算
             result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[

@@ -61,7 +61,7 @@ def _make_result_request(
             pageSize=pageSize,
             categoryCode="ZcyAnnouncement2",
             publishDateBegin="2022-01-01",
-            publishDateEnd="2022-01-31",
+            publishDateEnd="2022-01-04",
         ),
         headers={"Content-Type": "application/json;charset=UTF-8"},
         dont_filter=dont_filter,
@@ -225,6 +225,7 @@ class BiddingSpider(scrapy.Spider):
         # ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
     ]
     #  =========================================
+    #TODO: 6su4NhHpSMAGAJQcausoSw==标项解析存在问题，待解决
 
     def start_requests(self):
         """
@@ -509,6 +510,15 @@ class BiddingSpider(scrapy.Spider):
 
                 # 更新 html 内容
                 purchase_data = purchase.parse_html(html_content=data["content"])
+
+                # TODO 删除
+                # info = purchase_data.pop(constants.KEY_TEMP_BASE_INFO)
+                # logger.warning(f"info: {info}")
+                # tmp_item = {
+                #     constants.KEY_DEV_DEBUG_WRITE: True,
+                #     constants.KEY_TEMP_BASE_INFO: info
+                # }
+                # yield tmp_item
 
                 # 生成 item
                 yield common.make_item(data=meta, purchase_data=purchase_data)

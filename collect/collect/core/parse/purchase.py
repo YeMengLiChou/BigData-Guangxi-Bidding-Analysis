@@ -17,7 +17,12 @@ class StandardFormatParser(AbstractFormatParser):
     """
     标准格式文件的解析
     """
-    __PATTERN_BIDDING_PREFIX = re.compile(r"标项\S{1,2}")
+    # 解析基本情况的正则表达式
+    PATTERN_PROJECT_INFO = re.compile(
+        r"项目编号[:：]([-A-Z0-9a-z（(重)）]+)(?:\d\.)?项目名称[:：](\S+?)(?:\d\.)?(?:采购方式[:：]\S+)?(?:采购)?预算总?金额\S*?[:：]\D*?(\d+(?:\.\d*)?)"
+    )
+    # 解析标项信息的正则表达式
+    PATTERN_BIDDING = re.compile(r"(?:标项(\S{1,2}))?标项名称[:：](\S+?)数量:\S+?预算金额\S*?[:：](\d+(?:\.\d*)?)")
 
     @staticmethod
     @stats.function_stats(logger)
@@ -27,97 +32,65 @@ class StandardFormatParser(AbstractFormatParser):
         :param part:
         :return:
         """
+        # 去掉空白字符，避免正则匹配失败
+        s = "".join(part).replace(" ", "").replace("\u3000", "").replace(" ", "")
 
-        def get_colon_symbol(s: str) -> str:
-            if s.endswith(":"):
-                return ":"
-            if s.endswith("："):
-                return "："
-            raise ParseError(msg="不以：或: 作为标志符", content=[s])
+        # 分离为两部分，一部分是前面的基本信息，另一部分是后面的标项信息
+        split_idx = s.index("采购需求")
+        prefix, suffix = s[:split_idx], s[split_idx:]
 
-        def check_project_code(s: str) -> bool:
-            return s.startswith("项目编号")
+        data = dict()
+        bidding_items = []
+        data[constants.KEY_PROJECT_BID_ITEMS] = bidding_items
 
-        def check_project_name(s: str) -> bool:
-            return s.startswith("项目名称")
-
-        def check_bid_item_quantity(s: str) -> bool:
-            return s.startswith("数量") and sym.endswith_colon_symbol(s)
-
-        def check_bid_item_budget(s: str) -> bool:
-            return s.startswith("预算金额") and sym.endswith_colon_symbol(s)
-
-        def complete_purchase_bid_item(item: dict) -> dict:
-            """
-            完善标项信息
-            :param item:
-            :return:
-            """
-            if not bid_item.get(constants.KEY_BID_ITEM_QUANTITY, None):
-                bid_item[constants.KEY_BID_ITEM_QUANTITY] = (
-                    constants.BID_ITEM_QUANTITY_UNCLEAR
-                )
-            return item
-
-        data, bid_items = dict(), []
-        n, idx = len(part), 0
-        bid_item_index = 1
-        while idx < n:
-            text = part[idx]
+        total_budget: Union[float, None] = None
+        # 正则表达式匹配基本信息
+        if match := StandardFormatParser.PATTERN_PROJECT_INFO.search(prefix):
             # 项目编号
-            if check_project_code(text):
-                if not sym.endswith_colon_symbol(text):
-                    colon_symbol = get_colon_symbol(text)
-                    project_code = text.split(colon_symbol)[-1]
-                    idx += 1
-                else:
-                    project_code = part[idx + 1]
-                    idx += 2
-                data[constants.KEY_PROJECT_CODE] = project_code
+            data[constants.KEY_PROJECT_CODE] = match.group(1)
             # 项目名称
-            elif check_project_name(text):
-                if not sym.endswith_colon_symbol(text):
-                    colon_symbol = get_colon_symbol(text)
-                    project_name = text.split(colon_symbol)[-1]
-                    idx += 1
-                else:
-                    project_name = part[idx + 1]
-                    idx += 2
-                data[constants.KEY_PROJECT_NAME] = project_name
+            data[constants.KEY_PROJECT_NAME] = match.group(2)
             # 总预算
-            elif "预算总金额" in text:
-                budget = float(part[idx + 1])
-                data[constants.KEY_PROJECT_TOTAL_BUDGET] = budget
-                idx += 2
-            # 标项解析
-            # elif text.startswith("标项") and part[idx + 1].startswith("标项名称"):
-            elif StandardFormatParser.__PATTERN_BIDDING_PREFIX.fullmatch(text):
-                bid_item = common.get_template_bid_item(
-                    is_win=False, index=bid_item_index
-                )
-                idx += 2
-                # 标项名称
-                bid_item[constants.KEY_BID_ITEM_NAME] = part[idx]
-                idx += 1
-                while idx < n and not StandardFormatParser.__PATTERN_BIDDING_PREFIX.fullmatch(part[idx]):
-                    # 标项采购数量
-                    if check_bid_item_quantity(part[idx]):
-                        quantity = part[idx + 1]
-                        if quantity == "不限":
-                            quantity = constants.BID_ITEM_QUANTITY_UNLIMITED
-                        bid_item[constants.KEY_BID_ITEM_QUANTITY] = quantity
-                        idx += 2
-                    # 标项预算金额
-                    elif check_bid_item_budget(part[idx]):
-                        bid_item[constants.KEY_BID_ITEM_BUDGET] = float(part[idx + 1])
-                        idx += 2
+            total_budget = float(match.group(3))
+            data[constants.KEY_PROJECT_TOTAL_BUDGET] = total_budget
+            for d in match.groups():
+                if d is None:
+                    raise ParseError(msg='基本情况解析失败：其中一项/多项为None', content=part + [s])
+        else:
+            raise ParseError(msg='基本情况解析失败：匹配失败', content=part + [s])
+
+        if match := StandardFormatParser.PATTERN_BIDDING.findall(suffix):
+            if len(match) == 0:
+                raise ParseError(msg='基本情况解析失败：无标项信息', content=part + [s])
+            for m in match:
+                # 标项编号
+                item_index = 1
+                index, name, budget = m
+
+                if index is None or name is None or budget is None:
+                    raise ParseError(msg='标项解析失败', content=part + [s])
+
+                # 空串
+                if not index:
+                    index = item_index
+                else:
+                    # 阿拉伯数字
+                    if index.isdigit():
+                        index = int(index)
                     else:
-                        idx += 1
-                bid_item_index += 1
-                bid_items.append(complete_purchase_bid_item(bid_item))
-            else:
-                idx += 1
-        data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
+                        # 中文数字
+                        index = common.translate_zh_to_number(index)
+
+                item = common.get_template_bid_item(is_win=False,  index=index, name=name)
+                item[constants.KEY_BID_ITEM_BUDGET] = float(budget)
+                bidding_items.append(item)
+
+                item_index += 1
+                total_budget -= float(budget)
+        else:
+            raise ParseError(msg='基本情况解析失败：标项信息匹配失败', content=part + [s])
+        if total_budget > 1e-5:
+            raise ParseError(msg='标项预算合计与总预算不符', content=part + [s])
 
         return data
 
@@ -198,7 +171,7 @@ def parse_html(html_content: str):
         raise_error(
             error=e,
             msg="解析 __parse_standard_format 失败",
-            content=["\n".join(v) for _, v in parts],
+            content=["\n".join(v) for _, v in parts.items()],
         )
 
 
