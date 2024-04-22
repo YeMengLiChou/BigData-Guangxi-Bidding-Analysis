@@ -80,6 +80,8 @@ def parse_response_data(data: list):
             is_win, is_termination = False, True
 
         result_api_meta = {
+            # 爬取的时间戳
+            constants.KEY_PROJECT_SCRAPE_TIMESTAMP: item["publishDate"],
             # 结果公告的id（可能存在多个）
             constants.KEY_PROJECT_RESULT_ARTICLE_ID: item["articleId"],
             # 发布日期（可能存在多个）

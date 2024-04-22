@@ -1,8 +1,5 @@
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 import logging
+from typing import Union
 
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
@@ -12,25 +9,6 @@ import collect.collect.utils.redis_tools as redis
 from constant import constants
 
 logger = logging.getLogger(__name__)
-
-
-def update_redis_scraped_article_id(*article_ids):
-    """
-    更新 redis 中已爬取的公告 id
-    :param article_ids:
-    :return:
-    """
-    for ids in article_ids:
-        redis.add_unique_article_id(ids)
-
-
-def update_redis_latest_timestamp(timestamp: int):
-    """
-    更新 redis 中最新数据的时间戳
-    :param timestamp:
-    :return:
-    """
-    redis.set_latest_announcement_timestamp(timestamp)
 
 
 class UpdateRedisInfoPipeline:
@@ -63,14 +41,15 @@ class UpdateRedisInfoPipeline:
         # 更新两个公告的id
         purchase_id = item.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, [])
         result_id = item.get(constants.KEY_PROJECT_RESULT_ARTICLE_ID, [])
-        for _id in purchase_id:
-            redis.add_unique_article_id(_id)
-        for _id in result_id:
-            redis.add_unique_article_id(_id)
 
-        # 结果公告的发布日期作为标准
-        result_publish_date = item.get(constants.KEY_PROJECT_RESULT_PUBLISH_DATE, None)
-        if result_publish_date:
-            redis.set_latest_announcement_timestamp(timestamp=result_publish_date)
+        # 更新已经爬取的公告
+        redis.add_unique_article_ids(*purchase_id)
+        redis.add_unique_article_ids(*result_id)
 
+        # 更新最新的公告时间戳
+        scrape_timestamp: Union[int, None] = item.get(
+            constants.KEY_PROJECT_SCRAPE_TIMESTAMP, None
+        )
+        if scrape_timestamp:
+            redis.set_latest_announcement_timestamp(timestamp=scrape_timestamp)
         return item

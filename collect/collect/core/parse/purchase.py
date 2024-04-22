@@ -7,7 +7,7 @@ from collect.collect.core.error import SwitchError
 from collect.collect.core.parse import common, AbstractFormatParser
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import symbol_tools as sym, debug_stats as stats
+from collect.collect.utils import debug_stats as stats
 from constant import constants
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,8 @@ class StandardFormatParser(AbstractFormatParser):
 
     # 解析基本情况的正则表达式
     PATTERN_PROJECT_INFO = re.compile(
-        r"项目编号[:：]([-A-Z0-9a-z（(重)）]+)(?:\d\.)?项目名称[:：](\S+?)(?:\d\.)?(?:采购方式[:：]\S+)?(?:采购)?预算总?金额\S*?[:：]\D*?(\d+(?:\.\d*)?)"
+        r"项目编号[:：]([-A-Z0-9a-z（(重)）]+)(?:\d\.)?项目名称[:：](\S+?)(?:\d\.)?(?:采购方式[:：]\S+)?(?:采购)?预算总?金额\S*?[:：]\D*?(\d+("
+        r"?:\.\d*)?)"
     )
     # 解析标项信息的正则表达式
     PATTERN_BIDDING = re.compile(
@@ -98,6 +99,7 @@ class StandardFormatParser(AbstractFormatParser):
             raise ParseError(
                 msg="基本情况解析失败：标项信息匹配失败", content=part + [s]
             )
+
         if total_budget > 1e-5:
             raise ParseError(msg="标项预算合计与总预算不符", content=part + [s])
 
@@ -143,7 +145,7 @@ def parse_html(html_content: str):
                     idx += 1
                     # 从后面开始找
                     r_idx = n - 1
-                    # 找与 index 差1序号的标题
+                    # 找与 index 差 1 序号的标题
                     while (
                         r_idx > idx
                         and common.startswith_chinese_number(result[r_idx]) != index + 1

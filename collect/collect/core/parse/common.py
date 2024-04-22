@@ -531,6 +531,10 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
 
     # 从 data 中取出所需要的信息
     item = dict()
+    # 爬取的时间
+    item[constants.KEY_PROJECT_SCRAPE_TIMESTAMP] = data[
+        constants.KEY_PROJECT_SCRAPE_TIMESTAMP
+    ]
     # 项目名称
     item[constants.KEY_PROJECT_NAME] = data.get(constants.KEY_PROJECT_NAME, None)
     # 项目编号

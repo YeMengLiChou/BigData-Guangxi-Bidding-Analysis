@@ -153,6 +153,12 @@ ANNOUNCEMENT_TYPE_SHORTLISTED_FOR_PUBLIC_TENDER = 4004
 
 # ===================== Scrapy Item Key =====================
 
+KEY_PROJECT_SCRAPE_TIMESTAMP = "scrape_timestamp"
+"""
+项目-爬取公告的时间戳
+"""
+
+
 KEY_PROJECT_NAME = "project_name"
 """
 项目-项目名称

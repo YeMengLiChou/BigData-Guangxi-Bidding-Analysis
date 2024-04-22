@@ -102,13 +102,13 @@ def clear_latest_announcement_timestamp():
 # --------------------- ARTICLE IDS --------------------- #
 
 
-def add_unique_article_id(article_id: str) -> bool:
+def add_unique_article_ids(*article_ids: str) -> bool:
     """
-    添加一个唯一的公告结果 ID
-    :param article_id: 公告结果 ID
+    添加唯一的公告结果 ID
+    :param article_ids: 公告结果 ID
     :return: 是否添加成功
     """
-    return _client.sadd(KEY_ANNOUNCEMENT_ARTICLE_IDS, article_id) == 1
+    return _client.sadd(KEY_ANNOUNCEMENT_ARTICLE_IDS, *article_ids) == len(article_ids)
 
 
 def remove_article_id(article_id: str) -> bool:

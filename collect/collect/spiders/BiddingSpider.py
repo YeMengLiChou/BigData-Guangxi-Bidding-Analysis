@@ -25,7 +25,7 @@ from constant import constants
 logger = logging.getLogger(__name__)
 
 
-def get_articleId_from_url(url: str) -> str:
+def get_article_id_from_url(url: str) -> str:
     """
     从 url 中解析出 articleId
     :param url:
@@ -35,50 +35,17 @@ def get_articleId_from_url(url: str) -> str:
     return params["articleId"][0]
 
 
-@stats.function_stats(logger)
-def _make_result_request(
-    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
-):
-    """
-    生成结果列表的请求
-    :param pageNo 编号
-    :param pageSize 返回列表大小
-    :param callback 回调
-    :param dont_filter 不过滤该请求
-    :return:
-    """
-    # TODO: 根据redis中的缓存数据进行获取, redis 应该记录数据库中最新的数据
-    publish_date_begin = redis.get_latest_announcement_timestamp() or "2020-01-01"
-    publish_date_end = redis.parse_timestamp(timestamp=time_tools.now_timestamp())
-    # logging.info(f"redis lasting info: publish_date_begin: {publish_date_begin}, publish_date_end: {
-    # publish_date_end}")
-    return scrapy.Request(
-        url=CategoryApi.base_url,
-        callback=callback,
-        method=CategoryApi.method,
-        body=CategoryApi.generate_body(
-            pageNo=pageNo,
-            pageSize=pageSize,
-            categoryCode="ZcyAnnouncement2",
-            publishDateBegin="2022-01-01",
-            publishDateEnd="2022-01-04",
-        ),
-        headers={"Content-Type": "application/json;charset=UTF-8"},
-        dont_filter=dont_filter,
-    )
-
-
 @stats.function_stats(logger, log_params=True)
-def _make_detail_request(articleId: str, callback: callable, meta: dict):
+def _make_detail_request(article_id: str, callback: callable, meta: dict):
     """
     返回 detail api 的请求
-    :param articleId:
+    :param article_id:
     :param callback:
     :param meta:
     :return:
     """
     return scrapy.Request(
-        url=DetailApi.get_complete_url(articleId),
+        url=DetailApi.get_complete_url(article_id),
         callback=callback,
         method=DetailApi.method,
         meta=meta,
@@ -188,6 +155,21 @@ class BiddingSpider(scrapy.Spider):
         crawler.signals.connect(obj.spider_closed, signal=signals.spider_closed)
         return obj
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        redis_timestamp = redis.get_latest_announcement_timestamp()
+        self.publish_date_begin = redis_timestamp or "2022-01-01"
+        self.publish_date_end = redis.parse_timestamp(
+            timestamp=time_tools.now_timestamp()
+        )
+        logging.info(
+            f"Ensured span:\n"
+            f"redis_latest_timestamp: {redis_timestamp}\n"
+            f"publish_date_begin: {self.publish_date_begin}\n"
+            f"publish_date_end: {self.publish_date_end}"
+        )
+
     def spider_closed(self):
         stats.log_stats_collector()
 
@@ -223,8 +205,39 @@ class BiddingSpider(scrapy.Spider):
         # ("RWaFA6UZ54ytuJL5AsxQvQ==", False),  # parts 不足
         # ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
     ]
+
     #  =========================================
-    # TODO: 6su4NhHpSMAGAJQcausoSw==标项解析存在问题，待解决
+
+    @stats.function_stats(logger)
+    def _make_result_request(
+        self,
+        page_no: int,
+        page_size: int,
+        callback: callable,
+        dont_filter: bool = False,
+    ):
+        """
+        生成结果列表的请求
+        :param page_no 编号
+        :param page_size 返回列表大小
+        :param callback 回调
+        :param dont_filter 不过滤该请求
+        :return:
+        """
+        return scrapy.Request(
+            url=CategoryApi.base_url,
+            callback=callback,
+            method=CategoryApi.method,
+            body=CategoryApi.generate_body(
+                pageNo=page_no,
+                pageSize=page_size,
+                categoryCode="ZcyAnnouncement2",
+                publishDateBegin="2022-01-01",
+                publishDateEnd="2022-01-01",
+            ),
+            headers={"Content-Type": "application/json;charset=UTF-8"},
+            dont_filter=dont_filter,
+        )
 
     def start_requests(self):
         """
@@ -239,7 +252,7 @@ class BiddingSpider(scrapy.Spider):
             for article_id, is_win in self.special_article_ids:
                 logger.warning(f"Special Article: {article_id}")
                 yield _make_detail_request(
-                    articleId=urllib.parse.unquote(article_id),
+                    article_id=urllib.parse.unquote(article_id),
                     callback=self.parse_result_detail_content,
                     meta={
                         constants.KEY_PROJECT_RESULT_ARTICLE_ID: urllib.parse.unquote(
@@ -250,9 +263,9 @@ class BiddingSpider(scrapy.Spider):
                 )
         else:
             # 正常爬取
-            yield _make_result_request(
-                pageNo=1,
-                pageSize=1,
+            yield self._make_result_request(
+                page_no=1,
+                page_size=1,
                 callback=self.parse_result_amount,
                 dont_filter=True,
             )
@@ -270,14 +283,13 @@ class BiddingSpider(scrapy.Spider):
             total = int(data["result"]["data"]["total"])
             self.logger.debug(f"initial fetch amount: {total}")
             for i in range(1, total // 100 + 2):
-                yield _make_result_request(
-                    pageNo=i,
-                    pageSize=100,
+                yield self._make_result_request(
+                    page_no=i,
+                    page_size=100,
                     callback=self.parse_result_data,
                     dont_filter=True,
                 )
         else:
-            # TODO: 加入 retry 功能
             self.logger.error(f"response not success: {response.text}")
 
     @stats.function_stats(logger)
@@ -294,8 +306,16 @@ class BiddingSpider(scrapy.Spider):
             data: list = response_data["data"]
             # 对于列表中的每个公告数据，都拿到所需要的数据 meta，进而生成对应的请求
             for meta in result.parse_response_data(data):
+                article_id = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
+
+                # 查重
+                if redis.check_article_id_exist(article_id):
+                    logger.info(f"公告 {article_id} 已经爬取过，跳过该公告")
+                    self.crawler.stats.inc_value("scraped/duplicated")
+                    continue
+
                 yield _make_detail_request(
-                    articleId=meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID],
+                    article_id=article_id,
                     callback=self.parse_result_detail_content,
                     meta=meta,
                 )
@@ -370,7 +390,7 @@ class BiddingSpider(scrapy.Spider):
                 else:
                     # 存在 “采购公告”
                     yield _make_detail_request(
-                        articleId=purchase_article_ids[0],
+                        article_id=purchase_article_ids[0],
                         callback=self.parse_purchase,
                         meta=meta,
                     )
@@ -423,7 +443,7 @@ class BiddingSpider(scrapy.Spider):
             parsed_result_id |= 1 << next_idx
             meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID] = parsed_result_id
             return _make_detail_request(
-                articleId=next_result_id,
+                article_id=next_result_id,
                 callback=self.parse_result_detail_content,
                 meta=meta,
             )
@@ -448,7 +468,7 @@ class BiddingSpider(scrapy.Spider):
         for i in range(len(purchase_ids)):
             if ((parsed >> i) & 1) == 0:
                 return _make_detail_request(
-                    articleId=purchase_ids[i], callback=self.parse_purchase, meta=meta
+                    article_id=purchase_ids[i], callback=self.parse_purchase, meta=meta
                 )
         else:
             parsed += 1
@@ -479,7 +499,7 @@ class BiddingSpider(scrapy.Spider):
                 # 首先判断是不是第一次解析采购公告
                 if constants.KEY_DEV_START_PURCHASE_ARTICLE_ID not in meta:
                     # 当前公告id
-                    current_id = get_articleId_from_url(response.url)
+                    current_id = get_article_id_from_url(response.url)
                     meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID] = current_id
                     # 定位解析位置
                     purchase_ids: list = meta[
@@ -491,7 +511,7 @@ class BiddingSpider(scrapy.Spider):
                     meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
                 else:
                     # 当前公告id
-                    current_id = get_articleId_from_url(response.url)
+                    current_id = get_article_id_from_url(response.url)
                     parsed = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
                     purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
                     index = purchase_ids.index(current_id)
@@ -509,22 +529,13 @@ class BiddingSpider(scrapy.Spider):
                     # 在 2022 前的发布的公告大多格式不统一，直接切换
                     if data["publishDate"] < 1640966400000:
                         logger.warning(
-                            f"该公告 {get_articleId_from_url(response.url)} 在2022年前发布"
+                            f"该公告 {get_article_id_from_url(response.url)} 在2022年前发布"
                         )
                         yield self.switch_other_purchase_announcement(meta)
                         return None
 
                 # 更新 html 内容
                 purchase_data = purchase.parse_html(html_content=data["content"])
-
-                # TODO 删除
-                # info = purchase_data.pop(constants.KEY_TEMP_BASE_INFO)
-                # logger.warning(f"info: {info}")
-                # tmp_item = {
-                #     constants.KEY_DEV_DEBUG_WRITE: True,
-                #     constants.KEY_TEMP_BASE_INFO: info
-                # }
-                # yield tmp_item
 
                 # 生成 item
                 yield common.make_item(data=meta, purchase_data=purchase_data)
