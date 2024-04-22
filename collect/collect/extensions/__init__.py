@@ -1,5 +1,3 @@
 from .logstats import LogStats
 
-__all__ = [
-    "LogStats"
-]
+__all__ = ["LogStats"]

@@ -17,12 +17,15 @@ class StandardFormatParser(AbstractFormatParser):
     """
     标准格式文件的解析
     """
+
     # 解析基本情况的正则表达式
     PATTERN_PROJECT_INFO = re.compile(
         r"项目编号[:：]([-A-Z0-9a-z（(重)）]+)(?:\d\.)?项目名称[:：](\S+?)(?:\d\.)?(?:采购方式[:：]\S+)?(?:采购)?预算总?金额\S*?[:：]\D*?(\d+(?:\.\d*)?)"
     )
     # 解析标项信息的正则表达式
-    PATTERN_BIDDING = re.compile(r"(?:标项(\S{1,2}))?标项名称[:：](\S+?)数量:\S+?预算金额\S*?[:：](\d+(?:\.\d*)?)")
+    PATTERN_BIDDING = re.compile(
+        r"(?:标项(\S{1,2}))?标项名称[:：](\S+?)数量:\S+?预算金额\S*?[:：](\d+(?:\.\d*)?)"
+    )
 
     @staticmethod
     @stats.function_stats(logger)
@@ -55,20 +58,22 @@ class StandardFormatParser(AbstractFormatParser):
             data[constants.KEY_PROJECT_TOTAL_BUDGET] = total_budget
             for d in match.groups():
                 if d is None:
-                    raise ParseError(msg='基本情况解析失败：其中一项/多项为None', content=part + [s])
+                    raise ParseError(
+                        msg="基本情况解析失败：其中一项/多项为None", content=part + [s]
+                    )
         else:
-            raise ParseError(msg='基本情况解析失败：匹配失败', content=part + [s])
+            raise ParseError(msg="基本情况解析失败：匹配失败", content=part + [s])
 
         if match := StandardFormatParser.PATTERN_BIDDING.findall(suffix):
             if len(match) == 0:
-                raise ParseError(msg='基本情况解析失败：无标项信息', content=part + [s])
+                raise ParseError(msg="基本情况解析失败：无标项信息", content=part + [s])
             for m in match:
                 # 标项编号
                 item_index = 1
                 index, name, budget = m
 
                 if index is None or name is None or budget is None:
-                    raise ParseError(msg='标项解析失败', content=part + [s])
+                    raise ParseError(msg="标项解析失败", content=part + [s])
 
                 # 空串
                 if not index:
@@ -81,16 +86,20 @@ class StandardFormatParser(AbstractFormatParser):
                         # 中文数字
                         index = common.translate_zh_to_number(index)
 
-                item = common.get_template_bid_item(is_win=False,  index=index, name=name)
+                item = common.get_template_bid_item(
+                    is_win=False, index=index, name=name
+                )
                 item[constants.KEY_BID_ITEM_BUDGET] = float(budget)
                 bidding_items.append(item)
 
                 item_index += 1
                 total_budget -= float(budget)
         else:
-            raise ParseError(msg='基本情况解析失败：标项信息匹配失败', content=part + [s])
+            raise ParseError(
+                msg="基本情况解析失败：标项信息匹配失败", content=part + [s]
+            )
         if total_budget > 1e-5:
-            raise ParseError(msg='标项预算合计与总预算不符', content=part + [s])
+            raise ParseError(msg="标项预算合计与总预算不符", content=part + [s])
 
         return data
 
@@ -196,6 +205,5 @@ def _parse(parts: dict[int, list[str]]):
 
 
 if __name__ == "__main__":
-    content = \
-        ""
+    content = ""
     print(json.dumps(parse_html(content), indent=4, ensure_ascii=False))

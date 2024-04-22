@@ -53,9 +53,7 @@ DOWNLOADER_MIDDLEWARES = {
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
-EXTENSIONS = {
-    "collect.extensions.LogStats": 300
-}
+EXTENSIONS = {"collect.extensions.LogStats": 300}
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html

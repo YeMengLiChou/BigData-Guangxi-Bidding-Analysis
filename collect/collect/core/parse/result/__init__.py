@@ -258,7 +258,6 @@ def parse_html(html_content: str, is_win_bid: bool):
 
 
 if __name__ == "__main__":
-    content = \
-        ""
+    content = ""
     res = parse_html(content, False)
     print(json.dumps(res, ensure_ascii=False, indent=4))

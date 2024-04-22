@@ -37,7 +37,7 @@ def get_articleId_from_url(url: str) -> str:
 
 @stats.function_stats(logger)
 def _make_result_request(
-        pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
+    pageNo: int, pageSize: int, callback: callable, dont_filter: bool = False
 ):
     """
     生成结果列表的请求
@@ -193,7 +193,6 @@ class BiddingSpider(scrapy.Spider):
 
     # ========== use for debug ================
 
-
     special_article_ids = [
         # template: ("article_id", is_win: bool)
         # ("rr91aR+tRtF6REnhbSWTDw==", False),  # 废标理由共用
@@ -225,7 +224,7 @@ class BiddingSpider(scrapy.Spider):
         # ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
     ]
     #  =========================================
-    #TODO: 6su4NhHpSMAGAJQcausoSw==标项解析存在问题，待解决
+    # TODO: 6su4NhHpSMAGAJQcausoSw==标项解析存在问题，待解决
 
     def start_requests(self):
         """
@@ -455,10 +454,11 @@ class BiddingSpider(scrapy.Spider):
             parsed += 1
             if (parsed & (-parsed)) != parsed:
                 raise ParseError(
-                    msg="采购公告存在逻辑问题",
-                    content=[bin(parsed)[2:]] + purchase_ids
+                    msg="采购公告存在逻辑问题", content=[bin(parsed)[2:]] + purchase_ids
                 )
-            logger.warning(f"采购公告 {purchase_ids} 没有解析到任何标项信息， 直接生成 item")
+            logger.warning(
+                f"采购公告 {purchase_ids} 没有解析到任何标项信息， 直接生成 item"
+            )
             return common.make_item(data=meta, purchase_data=None)
 
     @stats.function_stats(logger)
@@ -482,7 +482,9 @@ class BiddingSpider(scrapy.Spider):
                     current_id = get_articleId_from_url(response.url)
                     meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID] = current_id
                     # 定位解析位置
-                    purchase_ids: list = meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID]
+                    purchase_ids: list = meta[
+                        constants.KEY_DEV_START_PURCHASE_ARTICLE_ID
+                    ]
                     index = purchase_ids.index(current_id)
                     parsed = 1 << index
                     # 标记当前位置
@@ -498,13 +500,17 @@ class BiddingSpider(scrapy.Spider):
 
                 # 某些文章id返回的数据为None，需要预选处理
                 if data is None:
-                    logger.warning(f" {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id")
+                    logger.warning(
+                        f" {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id"
+                    )
                     yield self.switch_other_purchase_announcement(meta)
                     return None
                 else:
                     # 在 2022 前的发布的公告大多格式不统一，直接切换
-                    if data['publishDate'] < 1640966400000:
-                        logger.warning(f"该公告 {get_articleId_from_url(response.url)} 在2022年前发布")
+                    if data["publishDate"] < 1640966400000:
+                        logger.warning(
+                            f"该公告 {get_articleId_from_url(response.url)} 在2022年前发布"
+                        )
                         yield self.switch_other_purchase_announcement(meta)
                         return None
 

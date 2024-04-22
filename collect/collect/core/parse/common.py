@@ -218,7 +218,7 @@ def parse_review_experts(part: list[str]) -> dict:
         if l != -1 and r != -1:
             # 名字在括号的右边：（xxx）名字
             if l == 0:
-                result = p[r + 1:]
+                result = p[r + 1 :]
             # 名字在括号的左边： 名字（xxx）
             elif r == len(p) - 1:
                 result = p[:l]
@@ -231,7 +231,7 @@ def parse_review_experts(part: list[str]) -> dict:
             # 去掉括号加入到评审小组
             review_experts.append(result)
             # 加入到采购代表人
-            if "采购" in p[l + 1: r]:
+            if "采购" in p[l + 1 : r]:
                 representors.append(result)
         elif l == -1 and r == -1:
             if p == "/":
@@ -287,8 +287,13 @@ def parse_bid_item_reason(reason: str) -> int:
     # 5.至投标截止时间，提交投标文件的投标人(少于三家)，本项目流标，由采购人依法重新招标
     # 6.经公开唱标，B分标无投标人参与投标，该分标采购失败。
     if (
-            ("三家" in reason or "3家" in reason) and ("不足" in reason or "少于" in reason)
-    ) or ("数量不符合" in reason) or ("无投标人参与" in reason):
+        (
+            ("三家" in reason or "3家" in reason)
+            and ("不足" in reason or "少于" in reason)
+        )
+        or ("数量不符合" in reason)
+        or ("无投标人参与" in reason)
+    ):
         return constants.BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS
 
     # 1. "评标委员会发现招标文件存在歧义，故本次采购活动作废标处理。
@@ -315,7 +320,11 @@ def parse_bid_item_reason(reason: str) -> int:
     # 1. 因(重大变故)，(采购)任务(取消)
     # 2. 因项目(重大变故)，(取消)本次(采购)
     # 3. 因项目有(重大变更)，故本项目(终止采购)。
-    if ("重大变故" in reason or "重大表更") and ("采购" in reason) and ("取消" in reason or "终止" in reason):
+    if (
+        ("重大变故" in reason or "重大表更")
+        and ("采购" in reason)
+        and ("取消" in reason or "终止" in reason)
+    ):
         return constants.BID_ITEM_REASON_MAJOR_CHANGES_AND_CANCEL
 
     # 1. 在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，以此类推
@@ -335,7 +344,9 @@ def parse_bid_item_reason(reason: str) -> int:
 
 PATTERN_PURCHASER = re.compile(r"采购人(?:信息|)名称[:：](\S+?)(?:地址|联系人)")
 
-PATTERN_PURCHASER_AGENCY = re.compile(r"采购代理机构(?:信息|)名称[：:](\S+?)(?:地址|联系人)")
+PATTERN_PURCHASER_AGENCY = re.compile(
+    r"采购代理机构(?:信息|)名称[：:](\S+?)(?:地址|联系人)"
+)
 
 
 @stats.function_stats(logger)
@@ -346,12 +357,7 @@ def parse_contact_info(part: str) -> dict:
     :return:
     """
     # 替换掉无用字符，避免干扰正则表达式
-    part = (
-        part
-        .replace(" ", "")
-        .replace(" ", "")
-        .replace("\u3000", "")
-    )
+    part = part.replace(" ", "").replace(" ", "").replace("\u3000", "")
 
     data = dict()
     if match := PATTERN_PURCHASER.search(part):
@@ -364,14 +370,17 @@ def parse_contact_info(part: str) -> dict:
     else:
         data[constants.KEY_PURCHASER_AGENCY] = None
 
-    if data[constants.KEY_PURCHASER] is None or data[constants.KEY_PURCHASER_AGENCY] is None:
-        raise ParseError(msg='出现新的联系方式内容', content=[part])
+    if (
+        data[constants.KEY_PURCHASER] is None
+        or data[constants.KEY_PURCHASER_AGENCY] is None
+    ):
+        raise ParseError(msg="出现新的联系方式内容", content=[part])
     return data
 
 
 @stats.function_stats(logger)
 def _merge_bid_items(
-        _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
+    _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
 ) -> list:
     """
     将两部分的标项信息合并
@@ -422,15 +431,15 @@ def _merge_bid_items(
         purchase_index = purchase_item[constants.KEY_BID_ITEM_INDEX]
         # 同一个标项 purchase_item 可能有多个 result_item 对应
         while (
-                r_idx < result_len
-                and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
+            r_idx < result_len
+            and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
         ):
             result_item = _result[r_idx]
             # 标项名称不一致
             if (
-                    result_item.get(constants.KEY_BID_ITEM_NAME, None)
-                    and purchase_item[constants.KEY_BID_ITEM_NAME]
-                    != result_item[constants.KEY_BID_ITEM_NAME]
+                result_item.get(constants.KEY_BID_ITEM_NAME, None)
+                and purchase_item[constants.KEY_BID_ITEM_NAME]
+                != result_item[constants.KEY_BID_ITEM_NAME]
             ):
                 raise ParseError(
                     msg="标项名称不一致",
@@ -603,9 +612,7 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
     )
 
     # 采购方信息
-    item[constants.KEY_PURCHASER] = data.get(
-        constants.KEY_PURCHASER, None
-    )
+    item[constants.KEY_PURCHASER] = data.get(constants.KEY_PURCHASER, None)
     # 采购方机构信息
     item[constants.KEY_PURCHASER_AGENCY] = data.get(
         constants.KEY_PURCHASER_AGENCY, None

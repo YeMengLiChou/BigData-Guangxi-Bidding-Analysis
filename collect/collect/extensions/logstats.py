@@ -35,11 +35,11 @@ class LogStats:
     def log(self, spider):
         latest_timestamp = self.stats.get_value("last_timestamp", 0)
 
-        msg = (
-            "Crawled latest announcement timestamp: %(latest_timestamp)s "
-        )
+        msg = "Crawled latest announcement timestamp: %(latest_timestamp)s "
         log_args = {
-            "latest_timestamp": datetime.datetime.fromtimestamp(latest_timestamp).strftime("%Y-%m-%d %H:%M:%S:%f"),
+            "latest_timestamp": datetime.datetime.fromtimestamp(
+                latest_timestamp
+            ).strftime("%Y-%m-%d %H:%M:%S:%f"),
         }
         logger.info(msg, log_args, extra={"spider": spider})
 

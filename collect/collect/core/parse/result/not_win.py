@@ -20,7 +20,9 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
     data = dict()
     # 解析 联系方式
     if constants.KEY_PART_CONTACT in parts:
-        data.update(common.parse_contact_info("".join(parts[constants.KEY_PART_CONTACT])))
+        data.update(
+            common.parse_contact_info("".join(parts[constants.KEY_PART_CONTACT]))
+        )
     # 解析 评审专家
     if constants.KEY_PART_REVIEW_EXPERT in parts:
         data.update(
@@ -92,7 +94,9 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
         # 每个标项都有单独的理由说明
         # 拿到关键词
-        if keyword := symbol_tools.get_symbol(tmp, ("标项", "分标", "包"), raise_error=False):
+        if keyword := symbol_tools.get_symbol(
+            tmp, ("标项", "分标", "包"), raise_error=False
+        ):
 
             # TODO: ex: 标项1:三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
             part = tmp.split("。")
@@ -112,11 +116,15 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
                 # 解析出是第几个标项
                 # 数字分标：分标1:xxxx
-                if match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_NUMBER_INDEX.match(p):
+                if match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_NUMBER_INDEX.match(
+                    p
+                ):
                     index, reason = match.group(1), match.group(2)
 
                 # 字母分标：A分标:xxxx
-                elif match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_CHARACTER_INDEX.match(p):
+                elif match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_CHARACTER_INDEX.match(
+                    p
+                ):
                     index, reason = match.group(1), match.group(2)
                     # 将其转化为 数字
                     index = ord(index) - ord("A") + 1

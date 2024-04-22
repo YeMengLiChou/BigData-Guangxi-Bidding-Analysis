@@ -68,8 +68,6 @@ class UpdateRedisInfoPipeline:
         for _id in result_id:
             redis.add_unique_article_id(_id)
 
-
-
         # 结果公告的发布日期作为标准
         result_publish_date = item.get(constants.KEY_PROJECT_RESULT_PUBLISH_DATE, None)
         if result_publish_date:

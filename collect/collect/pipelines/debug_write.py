@@ -24,7 +24,7 @@ class DebugWritePipeline:
             self.fp.close()
 
     def spider_open(self):
-        self.fp = open('logs/base_info_test_cases.txt', mode="a", encoding='utf-8')
+        self.fp = open("logs/base_info_test_cases.txt", mode="a", encoding="utf-8")
 
     def process_item(self, item, spider: Spider):
         if constant.constants.KEY_DEV_DEBUG_WRITE in item:

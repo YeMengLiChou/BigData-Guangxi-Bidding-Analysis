@@ -39,7 +39,9 @@ def parse_win_bid(parts: dict[int, list[str]]) -> dict:
         )
     # 解析 联系方式信息
     if constants.KEY_PART_CONTACT in parts:
-        data.update(common.parse_contact_info(part="".join(parts[constants.KEY_PART_CONTACT])))
+        data.update(
+            common.parse_contact_info(part="".join(parts[constants.KEY_PART_CONTACT]))
+        )
 
     return data
 
@@ -183,7 +185,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 colon_idx = part[idx].find("：")
                 if colon_idx == -1:
                     colon_idx = part[idx].find(":")
-                part.insert(idx + 1, part[idx][colon_idx + 1:])
+                part.insert(idx + 1, part[idx][colon_idx + 1 :])
                 nonlocal n
                 n += 1
 
@@ -195,7 +197,11 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 handle_title()
                 idx += 1
                 tmp_idx = idx
-                while idx < n and common.startswith_number_index(part[idx]) == -1 and not check_title():
+                while (
+                    idx < n
+                    and common.startswith_number_index(part[idx]) == -1
+                    and not check_title()
+                ):
                     idx += 1
                 item[constants.KEY_BID_ITEM_SUPPLIER] = "".join(part[tmp_idx:idx])
                 cnt += 1
@@ -203,7 +209,11 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 handle_title()
                 idx += 1
                 tmp_idx = idx
-                while idx < n and common.startswith_number_index(part[idx]) == -1 and not check_title():
+                while (
+                    idx < n
+                    and common.startswith_number_index(part[idx]) == -1
+                    and not check_title()
+                ):
                     idx += 1
                 item[constants.KEY_BID_ITEM_SUPPLIER_ADDRESS] = "".join(
                     part[tmp_idx:idx]
@@ -218,7 +228,8 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 while idx < n and (
                     common.startswith_number_index(part[idx]) == -1  # 不以 '数字.' 开头
                     or (
-                        (index := part[idx].find(".")) != -1  # 某些情况存在为小数开头，先找到小数点位置 index
+                        (index := part[idx].find("."))
+                        != -1  # 某些情况存在为小数开头，先找到小数点位置 index
                         and index < len(part[idx]) - 1  # 确保小数点后面有字符
                         and part[idx][index + 1].isdigit()  # 小数点后面是数字
                     )

@@ -48,7 +48,7 @@ def check_substrings_in_string(string: str, substrings: Iterable[str]) -> bool:
 
 
 def parse_amount_and_percent(
-        string: str, raise_error: bool = True
+    string: str, raise_error: bool = True
 ) -> tuple[Union[float, None], Union[bool, None], bool]:
     """
     解析金额和百分比
@@ -71,7 +71,7 @@ def parse_amount_and_percent(
 
     # 匹配类型： [文字说明] :/： [金额] (/（[单位])/）
     elif (match := PATTERN_DESC_NUMBER_UNIT.fullmatch(string)) or (
-            match := PATTERN_DESC_NUMBER_UNIT_NO_COMMA.fullmatch(string)
+        match := PATTERN_DESC_NUMBER_UNIT_NO_COMMA.fullmatch(string)
     ):
         # 前缀描述，金额数字，小数位，单位
         desc, amount_text, unit = match.groups()
@@ -79,7 +79,7 @@ def parse_amount_and_percent(
 
         # 服务总报价、竞标总报价、响应总报价、总价、最终评审价、最后报价、最终报价、投标总价、磋商总报价、投标总报价、单价报价合计、总价大写、金额
         if check_substrings_in_string(
-                desc, substrings=("总价", "总报价", "最终", "最后", "合计", "金额", "合价")
+            desc, substrings=("总价", "总报价", "最终", "最后", "合计", "金额", "合价")
         ):
             amount, is_percent = float(amount_text), False
             if check_substrings_in_string(desc, substrings=("系数", "率")):
@@ -94,7 +94,7 @@ def parse_amount_and_percent(
             amount, is_percent = float(amount_text), False
             if check_substrings_in_string(desc, substrings=("系数", "率")):
                 # 仅有单位为 % 才能设置（ex 单项合价（元） ③＝①×②/费率:650000(元)）
-                if unit == '%':
+                if unit == "%":
                     is_percent = True
             if unit == "%":
                 is_percent = True
@@ -121,7 +121,7 @@ def parse_amount_and_percent(
             # 带有百分比的，一致认为是折扣计算
             if unit == "%":
                 amount, is_percent = float(amount_text), True
-            elif unit == '元':
+            elif unit == "元":
                 amount, is_percent = float(amount_text), False
                 # 不确定该项是否有用
                 return amount, is_percent, False
@@ -315,7 +315,6 @@ if __name__ == "__main__":
         "投标单价（元/吨）:475(元)",
         "价格:13185000(元)",
         "抽样车:3900(元),商务车1:8800(元),商务车2:530(元)",
-
     ]
     logging.basicConfig()
     for p in text:
