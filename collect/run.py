@@ -69,7 +69,7 @@ def configure_logging(settings: Settings):
         )
 
         formatter = logging.Formatter(  # 设置日志格式
-            fmt=log_dateformat, datefmt=log_dateformat
+            fmt=log_format, datefmt=log_dateformat
         )
         handler.setFormatter(formatter)
         if settings.getbool("LOG_SHORT_NAMES"):  # 是否缩写
