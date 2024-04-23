@@ -28,9 +28,9 @@ def _parse_article_id(url: str) -> str | None:
     :param url:
     :return:
     """
-    articleId = _extract_url_param(url).get("articleId", None)
-    if articleId:
-        return unquote(articleId[0])
+    article_id = _extract_url_param(url).get("articleId", None)
+    if article_id:
+        return unquote(article_id[0])
     return None
 
 
@@ -64,7 +64,7 @@ class ArticleIdFilterDownloadMiddleware:
             if article_id and redis.check_article_id_exist(article_id):
                 self.stats.inc_value("filtered_count")
                 raise IgnoreRequest(
-                    f"article_id: {article_id} is duplicated, filter it!"
+                    f"article_id: `{article_id}` is duplicated, filter it!"
                 )
 
         return None

@@ -1,3 +1,4 @@
+import importlib
 import json
 import logging
 import urllib.parse
@@ -171,6 +172,10 @@ class BiddingSpider(scrapy.Spider):
             f"publish_date_begin: {self.publish_date_begin}\n"
             f"publish_date_end: {self.publish_date_end}"
         )
+        # 读取特殊article_id
+        module = importlib.import_module("collect.collect.spiders.error_article_ids")
+        self.special_article_ids = module.ids
+        logger.warning(self.special_article_ids)
 
     def spider_closed(self):
         stats.log_stats_collector()
