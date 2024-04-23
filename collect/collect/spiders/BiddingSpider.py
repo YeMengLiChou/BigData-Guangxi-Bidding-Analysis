@@ -158,7 +158,9 @@ class BiddingSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        redis_timestamp = redis.get_latest_announcement_timestamp()
+        # 从redis中读取最新的公告时间戳
+        redis_timestamp = redis.get_latest_announcement_timestamp(parse_to_str=True)
+
         self.publish_date_begin = redis_timestamp or "2022-01-01"
         self.publish_date_end = redis.parse_timestamp(
             timestamp=time_tools.now_timestamp()
@@ -232,8 +234,8 @@ class BiddingSpider(scrapy.Spider):
                 pageNo=page_no,
                 pageSize=page_size,
                 categoryCode="ZcyAnnouncement2",
-                publishDateBegin="2022-01-01",
-                publishDateEnd="2022-01-01",
+                publishDateBegin=self.publish_date_begin,
+                publishDateEnd=self.publish_date_end,
             ),
             headers={"Content-Type": "application/json;charset=UTF-8"},
             dont_filter=dont_filter,

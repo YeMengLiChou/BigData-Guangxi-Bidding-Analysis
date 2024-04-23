@@ -5,7 +5,7 @@ import atexit
 from typing import Union
 from kafka import KafkaProducer, KafkaAdminClient, errors, admin
 from config.config import settings
-
+from collect.collect.utils import debug_stats
 from collect.collect.utils import time
 
 __all__ = ["send_item_to_kafka"]
@@ -17,9 +17,8 @@ _admin: Union[KafkaAdminClient, None] = None
 _lock = threading.Lock()
 _config = dict()
 
-DEBUG = True
-if DEBUG:
-    logging.basicConfig(level=logging.INFO)
+
+DEBUG = debug_stats.debug_status()
 
 
 def _init_config():
@@ -28,27 +27,27 @@ def _init_config():
     :return:
     """
     if DEBUG:
-        _config["hostname"] = "172.27.237.77"
+        _config["host"] = "172.27.237.77"
         _config["port"] = 9092
-        _config["topic"] = "test1"
+        _config["topic"] = "test"
         _config["key"] = None
     else:
-        _config["hostname"] = getattr(settings, "kafka.hostname", None)
+        _config["host"] = getattr(settings, "kafka.host", None)
         _config["port"] = getattr(settings, "kafka.port", None)
         _config["topic"] = getattr(settings, "kafka.scrapy.topic", None)
         _config["key"] = getattr(settings, "kafka.scrapy.key", None)
 
-    if _config.get("hostname", None) is None:
-        raise ValueError("kafka.hostname is not set in settings.toml")
+    if _config['host'] is None:
+        raise ValueError("kafka.host is not set in settings.toml")
 
-    if _config.get("port", None) is None:
+    if _config['port'] is None:
         raise ValueError("kafka.port is not set in settings.toml")
 
-    if _config.get("topic", None) is None:
+    if _config['topic'] is None:
         raise ValueError("kafka.scrapy.topic is not set in settings.toml")
 
     logger.info(
-        f"bootstrap-server={_config['hostname']}:{_config['port']}, topic={_config['topic']}"
+        f"kafka: bootstrap-server={_config['host']}:{_config['port']}, topic={_config['topic']}"
     )
 
 
@@ -57,7 +56,7 @@ def _init_producer():
     初始化 Kafka Producer
     :return:
     """
-    server = f"{_config['hostname']}:{_config['port']}"
+    server = f"{_config['host']}:{_config['port']}"
     return KafkaProducer(
         bootstrap_servers=[server],
         value_serializer=lambda x: x.encode("utf-8"),
@@ -69,7 +68,7 @@ def _init_admin():
     初始化 KafkaAdminClient 用于创建主题
     :return:
     """
-    server = f"{_config['hostname']}:{_config['port']}"
+    server = f"{_config['host']}:{_config['port']}"
     logging.info(f"init kafka admin client with server: {server}")
     return KafkaAdminClient(bootstrap_servers=server)
 
@@ -102,7 +101,7 @@ if _producer is None:
             # 没有链接到服务器
             if not _producer.bootstrap_connected():
                 raise ConnectionError(
-                    "kafka bootstrap server is not connected! please make sure your hostname and post!"
+                    "kafka bootstrap server is not connected! please make sure your host and post!"
                 )
 
 
