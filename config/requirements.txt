@@ -4,4 +4,4 @@ dynaconf==3.2.5  # config
 coloredlogs==15.0.1  # colorful logs
 redis==5.0.3  # cache database
 black==24.3.0  # code reformat
-confluent-kafka==2.3.0  # kafka python api
+kafka-python==2.0.2
