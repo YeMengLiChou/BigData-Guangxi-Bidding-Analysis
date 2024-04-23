@@ -342,10 +342,12 @@ def parse_bid_item_reason(reason: str) -> int:
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
 
-PATTERN_PURCHASER = re.compile(r"采购人(?:信息|)名称[:：](\S+?)(?:地址|联系人)")
+PATTERN_PURCHASER = re.compile(
+    r"采购人(?:信息|)(?:\S*?名称)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
+)
 
 PATTERN_PURCHASER_AGENCY = re.compile(
-    r"采购代理机构(?:信息|)名称[：:](\S+?)(?:地址|联系人)"
+    r"采购代理机构(?:信息|)(?:\S*?名称)?[：:](\S+?)(?:地址|联系人|联系方式)[:：]"
 )
 
 
