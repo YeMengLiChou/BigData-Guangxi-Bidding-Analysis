@@ -445,22 +445,33 @@ def _merge_bid_items(
     for p_idx in range(n):
         purchase_item = _purchase[p_idx]
         purchase_index = purchase_item[constants.KEY_BID_ITEM_INDEX]
+        # 将空格去掉
+        purchase_item_name: Union[str, None] = purchase_item.get(constants.KEY_BID_ITEM_NAME, None)
+        if purchase_item_name:
+            purchase_item_name.replace(" ", "")
+
         # 同一个标项 purchase_item 可能有多个 result_item 对应
         while (
-            r_idx < result_len
-            and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
+                r_idx < result_len
+                and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
         ):
             result_item = _result[r_idx]
+
+            result_item_name: Union[None, str] = result_item.get(
+                constants.KEY_BID_ITEM_NAME, None
+            )
+            if result_item_name:
+                result_item_name.replace(" ", "")
+
             # 标项名称不一致
             if (
-                result_item.get(constants.KEY_BID_ITEM_NAME, None)
-                and purchase_item[constants.KEY_BID_ITEM_NAME]
-                != result_item[constants.KEY_BID_ITEM_NAME]
+                result_item_name and result_item_name != purchase_item_name
             ):
                 raise ParseError(
                     msg="标项名称不一致",
                     content=[
-                        f"purchase item: {purchase_item}, result item: {result_item}"
+                        f"purchase item: {purchase_item}",
+                        f"result item: {result_item}"
                     ],
                 )
             # 标项名称
@@ -471,7 +482,6 @@ def _merge_bid_items(
             result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[
                 constants.KEY_BID_ITEM_BUDGET
             ]
-
             r_idx += 1
 
     return _result

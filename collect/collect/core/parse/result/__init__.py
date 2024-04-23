@@ -113,6 +113,7 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
     :param title:
     :return:
     """
+    print(title)
     # 项目编号部分
     if "项目编号" in title:
         return constants.KEY_PART_PROJECT_CODE
@@ -131,7 +132,7 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
 
     if is_win:
         # 中标结果部分
-        if "中标" in title:
+        if "中标（成交）信息" in title or "中标信息" in title:
             return constants.KEY_PART_WIN_BID
     else:
         # 废标结果部分
@@ -249,7 +250,6 @@ def parse_html(html_content: str, is_win_bid: bool):
 
         # 废标结果、终止公告
         else:
-
             # 废标结果可能没有标项信息，所以不做判断
             data = not_win.parse_not_win_bid(parts)
             project_data.update(data)
@@ -262,6 +262,7 @@ def parse_html(html_content: str, is_win_bid: bool):
 
 
 if __name__ == "__main__":
-    content = ""
+    content = \
+        ""
     res = parse_html(content, False)
     print(json.dumps(res, ensure_ascii=False, indent=4))

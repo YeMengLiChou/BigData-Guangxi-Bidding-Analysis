@@ -35,5 +35,7 @@ def request_detail(article_id: str):
         print("请求失败")
 
 
+
+
 if __name__ == '__main__':
-    request_detail("9Nl264NBe3kToCeHa1bpog==")
+ pass

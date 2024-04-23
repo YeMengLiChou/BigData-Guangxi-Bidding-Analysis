@@ -12,7 +12,6 @@ _client: Union[Redis, None] = None
 
 _lock = threading.Lock()
 
-
 if not _client:
     with _lock:
         if not _client:
@@ -22,7 +21,6 @@ if not _client:
                 db=getattr(settings, "redis.db", 0),
                 decode_responses=True,
             )
-
 
 # ========================== KEY CONSTANTS ========================= #
 
@@ -51,7 +49,7 @@ def parse_timestamp(timestamp: int) -> str:
 
 
 def get_latest_announcement_timestamp(
-    parse_to_str: bool = True,
+        parse_to_str: bool = True,
 ) -> Union[int, str, None]:
     """
     获取数据库中最新的公告时间戳
@@ -135,6 +133,13 @@ def count_article_ids() -> int:
     :return: 公告结果数量
     """
     return _client.scard(KEY_ANNOUNCEMENT_ARTICLE_IDS)
+
+
+def delete_all_article_ids():
+    """
+    删除所有公告结果 ID
+    """
+    _client.delete(KEY_ANNOUNCEMENT_ARTICLE_IDS)
 
 
 if __name__ == "__main__":
