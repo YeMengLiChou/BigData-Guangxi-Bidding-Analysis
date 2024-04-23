@@ -336,9 +336,23 @@ def parse_bid_item_reason(reason: str) -> int:
     if "软件著作权" in reason and "不符" in reason:
         return constants.BID_ITEM_REASON_COPYRIGHT_INCONSISTENT
 
-    # 1. 本项目应采购人要求，经政府采购监督管理部门同意，终止此次(采购)。
-    if "终止此次采购" in reason:
+    # 1. 本项目应采购人要求，经政府采购监督管理部门同意，(终止)此次(采购)。
+    if "终止" in reason and "采购" in reason:
         return constants.BID_ITEM_REASON_PROCUREMENT_TERMINATION
+
+    # 1.本项目在系统生成项目时没有分标项生成，导致(报价评审无法进行)，故本项目作废标处理
+    if "报价评审" in reason and "无法进行" in reason:
+        return constants.BID_ITEM_REASON_UNABLE_QUOTATION_REVIEW
+
+    # 1. 按照采购文件要求：响应文件承诺不得直接复制采购需求，供货商存在直接复制采购需求现象
+    if "直接复制" in reason and "采购需求" in reason:
+        return constants.BID_ITEM_REASON_SUPPLIER_COPY_PROCUREMENT_REQUIREMENTS
+
+    # 1. （桂政办发〔2021〕78号）已废止招标文件引用的桂政办发【2015】78 号文内容，招标文件A分标存在重大缺陷应当停止评标工作。
+    if "招标文件" in reason and "存在" in reason and "缺陷" in reason:
+        return constants.BID_ITEM_REASON_TENDER_DOCUMENTS_EXIST_SIGNIFICANT_DEFECTS
+
+
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
 
