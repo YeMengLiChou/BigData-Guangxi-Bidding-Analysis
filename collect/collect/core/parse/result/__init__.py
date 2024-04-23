@@ -113,7 +113,6 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
     :param title:
     :return:
     """
-    print(title)
     # 项目编号部分
     if "项目编号" in title:
         return constants.KEY_PART_PROJECT_CODE

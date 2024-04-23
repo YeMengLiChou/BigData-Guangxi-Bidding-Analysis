@@ -162,10 +162,12 @@ class BiddingSpider(scrapy.Spider):
         # 从redis中读取最新的公告时间戳
         redis_timestamp = redis.get_latest_announcement_timestamp(parse_to_str=True)
 
-        self.publish_date_begin = redis_timestamp or "2022-01-01"
-        self.publish_date_end = redis.parse_timestamp(
-            timestamp=time_tools.now_timestamp()
-        )
+        # self.publish_date_begin = redis_timestamp or "2022-01-01"
+        # self.publish_date_end = redis.parse_timestamp(
+        #     timestamp=time_tools.now_timestamp()
+        # )
+        self.publish_date_begin = "2022-01-01"
+        self.publish_date_end = "2022-01-01"
         logging.info(
             f"Ensured span:\n"
             f"redis_latest_timestamp: {redis_timestamp}\n"
@@ -203,19 +205,19 @@ class BiddingSpider(scrapy.Spider):
         # ("Sfb/HdmkZ9wKtTvcGOIfjQ==", False),  # 需要切换采购公告
         # ("6OPa2XaYAImxu/6nudSv+g==", True),  # 需要切换采购公告
         # ==================== 最近的 ========================
-        ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 死循环
-        ("bzHfq7PCKWTHrBHufwfWIQ%3D%3D", True),  # 采购公告存在isExist为True但是api返回的data为None
-        ("Aqick03HkvP6p/zD8IHU6A==", True),  # 出现新的标项序号
-        ("OyDFIFvfxl6BjoGP8klhJQ==", True),  # 出现新的金额格式  单项合价（元） ③＝①×②/费率:650000(元) *2
-        ("4y99t6bWQoaIdhPnt313QQ==", True),  # 出现新的金额格式   每年可行性缺口补助:530000000(元)
-        ("2ST2nVcVaFIlY4NIeie27g==", True),  # 出现新的中标格式： 中标金额
-        ("R99B3UWFEqrLF/tksnsgqw==", True), # 出现新的金额格式  价格:13185000(元)
-        ("QAI+LyiIc1LYJjpYA0omCA==", False),  # 废标理由共用
-        ("JfuMrotn+DZtCSb9lr5l8w==", True),  # 采购标项出现错误
-        ("PmO7xF3SbGGRAmFiNUcxyQ==", False),  # parts 不足
-        ("Zq/T/LwmDS54RA5CZferSw==", False),  # 出现 “流标理由”
-        ("RWaFA6UZ54ytuJL5AsxQvQ==", False),  # parts 不足
-        ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
+        # ("NtUNOAS3ZpBxTZ7Y%2BnqDaA%3D%3D", True),  # 死循环
+        # ("bzHfq7PCKWTHrBHufwfWIQ%3D%3D", True),  # 采购公告存在isExist为True但是api返回的data为None
+        # ("Aqick03HkvP6p/zD8IHU6A==", True),  # 出现新的标项序号
+        # ("OyDFIFvfxl6BjoGP8klhJQ==", True),  # 出现新的金额格式  单项合价（元） ③＝①×②/费率:650000(元) *2
+        # ("4y99t6bWQoaIdhPnt313QQ==", True),  # 出现新的金额格式   每年可行性缺口补助:530000000(元)
+        # ("2ST2nVcVaFIlY4NIeie27g==", True),  # 出现新的中标格式： 中标金额
+        # ("R99B3UWFEqrLF/tksnsgqw==", True), # 出现新的金额格式  价格:13185000(元)
+        # ("QAI+LyiIc1LYJjpYA0omCA==", False),  # 废标理由共用
+        # ("JfuMrotn+DZtCSb9lr5l8w==", True),  # 采购标项出现错误
+        # ("PmO7xF3SbGGRAmFiNUcxyQ==", False),  # parts 不足
+        # ("Zq/T/LwmDS54RA5CZferSw==", False),  # 出现 “流标理由”
+        # ("RWaFA6UZ54ytuJL5AsxQvQ==", False),  # parts 不足
+        # ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
     ]
 
     #  =========================================

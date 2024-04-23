@@ -60,6 +60,9 @@ def _init_producer():
     return KafkaProducer(
         bootstrap_servers=[server],
         value_serializer=lambda x: x.encode("utf-8"),
+        key_serializer=lambda x: x.encode("utf-8"),
+        retries=3,
+        compression_type="gzip",
     )
 
 
