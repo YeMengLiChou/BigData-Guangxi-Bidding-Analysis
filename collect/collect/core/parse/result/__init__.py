@@ -6,7 +6,8 @@ from collect.collect.core import error
 from collect.collect.core.parse import common, errorhandle
 from collect.collect.core.parse.result import not_win, win
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import debug_stats as stats, symbol_tools
+from utils import symbol_tools
+from utils import debug_stats as stats
 from constant import constants
 
 try:

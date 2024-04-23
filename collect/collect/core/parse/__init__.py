@@ -3,7 +3,8 @@ import re
 from typing import Iterable, Union
 
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import calculate, debug_stats as stats, symbol_tools
+from utils import calculate, symbol_tools
+from utils import debug_stats as stats
 
 __all__ = [
     "purchase",

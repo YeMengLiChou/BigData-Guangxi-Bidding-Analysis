@@ -5,7 +5,7 @@ from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.statscollectors import StatsCollector
 
-import collect.collect.utils.redis_tools as redis
+import utils.redis_tools as redis
 from constant import constants
 
 logger = logging.getLogger(__name__)

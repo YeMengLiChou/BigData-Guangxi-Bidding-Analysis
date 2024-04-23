@@ -7,7 +7,7 @@ from collect.collect.core.error import SwitchError
 from collect.collect.core.parse import common, AbstractFormatParser
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import debug_stats as stats
+from utils import debug_stats as stats
 from constant import constants
 
 logger = logging.getLogger(__name__)

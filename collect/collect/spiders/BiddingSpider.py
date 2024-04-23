@@ -16,11 +16,11 @@ from collect.collect.core.error import SwitchError
 from collect.collect.core.parse import result, purchase, common
 from collect.collect.core.parse.result import errorhandle
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import (
+from utils import (
     redis_tools as redis,
     time as time_tools,
-    debug_stats as stats,
 )
+from utils import debug_stats as stats
 from constant import constants
 
 logger = logging.getLogger(__name__)

@@ -5,8 +5,8 @@ import atexit
 from typing import Union
 from kafka import KafkaProducer, KafkaAdminClient, errors, admin
 from config.config import settings
-from collect.collect.utils import debug_stats
-from collect.collect.utils import time
+from utils import debug_stats
+from utils import time
 
 __all__ = ["send_item_to_kafka"]
 

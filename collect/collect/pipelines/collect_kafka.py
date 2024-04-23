@@ -3,7 +3,7 @@ import logging
 from scrapy.crawler import Crawler
 from scrapy.statscollectors import StatsCollector
 
-from collect.collect.utils import kafka_tools
+from utils import kafka_tools
 
 logger = logging.getLogger(__name__)
 

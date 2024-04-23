@@ -6,7 +6,7 @@ from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest
 
-from collect.collect.utils import redis_tools as redis
+from utils import redis_tools as redis
 
 logger = logging.getLogger(__name__)
 

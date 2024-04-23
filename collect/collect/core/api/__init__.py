@@ -1,8 +1,6 @@
 from abc import ABC
 from typing import Optional
 
-import scrapy
-
 
 class BaseApi(ABC):
     base_url: Optional[str] = None

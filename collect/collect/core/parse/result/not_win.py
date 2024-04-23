@@ -4,7 +4,8 @@ import re
 from collect.collect.core.parse import AbstractFormatParser, common
 from collect.collect.core.error import SwitchError
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import debug_stats as stats, symbol_tools
+from utils import symbol_tools
+from utils import debug_stats as stats
 from constant import constants
 
 logger = logging.getLogger(__name__)

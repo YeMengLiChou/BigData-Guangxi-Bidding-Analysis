@@ -1,6 +1,6 @@
 from urllib.parse import quote
 from collect.collect.core.api import GETBaseApi
-from collect.collect.utils import time
+from utils import time
 
 
 class DetailApi(GETBaseApi):
@@ -9,18 +9,18 @@ class DetailApi(GETBaseApi):
 
     @staticmethod
     def get_complete_url(
-        articleId: str, parentId: int = 66485, timestamp: int = time.now_timestamp()
+        article_id: str, parent_id: int = 66485, timestamp: int = time.now_timestamp()
     ) -> str:
         """
         生成完整的请求 url
-        :param articleId:
-        :param parentId:
+        :param article_id:
+        :param parent_id:
         :param timestamp:
         :return:
         """
         return (
             f"{DetailApi.base_url}"
-            f"?articleId={quote(articleId)}"
-            f"&parentId={parentId}"
+            f"?articleId={quote(article_id)}"
+            f"&parentId={parent_id}"
             f"&timestamp={timestamp}"
         )

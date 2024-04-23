@@ -5,7 +5,8 @@ from typing import Union
 from lxml import etree
 
 from collect.collect.middlewares import ParseError
-from collect.collect.utils import symbol_tools as sym, debug_stats as stats
+from utils import symbol_tools as sym
+from utils import debug_stats as stats
 from constant import constants
 
 logger = logging.getLogger(__name__)

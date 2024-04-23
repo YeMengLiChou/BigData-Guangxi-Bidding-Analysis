@@ -11,7 +11,7 @@ from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
 from constant import constants
-from collect.collect.utils import time
+from utils import time
 
 logger = logging.getLogger(__name__)
 
