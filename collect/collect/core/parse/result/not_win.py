@@ -20,31 +20,31 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
     """
     data = dict()
     # 解析 联系方式
-    if constants.KEY_PART_CONTACT in parts:
+    if constants.PartKey.CONTACT in parts:
         data.update(
-            common.parse_contact_info("".join(parts[constants.KEY_PART_CONTACT]))
+            common.parse_contact_info("".join(parts[constants.PartKey.CONTACT]))
         )
     # 解析 评审专家
-    if constants.KEY_PART_REVIEW_EXPERT in parts:
+    if constants.PartKey.REVIEW_EXPERT in parts:
         data.update(
             NotWinBidStandardFormatParser.parse_review_expert(
-                parts[constants.KEY_PART_REVIEW_EXPERT]
+                parts[constants.PartKey.REVIEW_EXPERT]
             )
         )
     # 解析 废标理由
-    if constants.KEY_PART_NOT_WIN_BID in parts:
+    if constants.PartKey.NOT_WIN_BID in parts:
         data.update(
             NotWinBidStandardFormatParser.parse_cancel_reason(
-                parts[constants.KEY_PART_NOT_WIN_BID]
+                parts[constants.PartKey.NOT_WIN_BID]
             )
         )
     # 解析 终止理由
-    if constants.KEY_PART_TERMINATION_REASON in parts:
+    if constants.PartKey.TERMINATION_REASON in parts:
         # 存在一种情况：标的类型是废标，但是实际上是终止，在这里加上去
         data[constants.KEY_PROJECT_IS_TERMINATION] = True
         data.update(
             NotWinBidStandardFormatParser.parse_termination_reason(
-                parts[constants.KEY_PART_TERMINATION_REASON]
+                parts[constants.PartKey.TERMINATION_REASON]
             )
         )
 
@@ -67,6 +67,12 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
     __PATTERN_BID_ITEM_NUMBER_INDEX = re.compile(r"(?:分标|标项|包)(\d+)[:：]?(.*)")
     # 字母序号"
     __PATTERN_BID_ITEM_CHARACTER_INDEX = re.compile(r"([A-Z])(?:分标|标项)[:：]?(.*)")
+
+    # 合并在一起的标项
+    # 本项目1、2分标投标文件提交截止时间后提交投标文件的供应商不足三家，本项目废标
+    __PATTERN_BID_ITEM_COMPACT_INDEX = re.compile(
+        r"(?:标项)?((?:\d{1,2}、)+\d{1,2})(?:分标)?(\S+)"
+    )
 
     @staticmethod
     @stats.function_stats(logger)
@@ -92,7 +98,6 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
         # 存在文本分开的情况
         tmp = "".join(part)
-
         # 每个标项都有单独的理由说明
         # 拿到关键词
         if keyword := symbol_tools.get_symbol(
@@ -100,21 +105,19 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         ):
 
             # TODO: ex: 标项1:三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
-            part = tmp.split("。")
+            part = list(filter(lambda x: x, tmp.split("。")))
             del tmp
             # 存在 "分标1:xxxx;分标2:xxxx;" 这种合并在同一个字符串的情况
             if len(part) == 1:
                 sym = symbol_tools.get_symbol(part[0], (";", "；"), raise_error=False)
                 if sym:
                     part = part[0].split(sym)
-
             for p in part:
                 if not p:
                     continue
 
                 if keyword not in p:
                     continue
-
                 # 解析出是第几个标项
                 # 数字分标：分标1:xxxx
                 if match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_NUMBER_INDEX.match(
@@ -129,15 +132,37 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                     index, reason = match.group(1), match.group(2)
                     # 将其转化为 数字
                     index = ord(index) - ord("A") + 1
+
+                # 连续的 标项：本项目1、2分标投标文件提交截止时间后提交投标文件的供应商不足三家，本项目废标"
+                elif match := NotWinBidStandardFormatParser.__PATTERN_BID_ITEM_COMPACT_INDEX.search(
+                    p
+                ):
+                    index_sequence, reason = match.groups()
+                    index = index_sequence.split("、")
+
                 else:
                     raise ParseError(f"废标结果存在新的格式: `{p}`", content=part)
 
                 # 生成标项信息
-                bid_item = common.get_template_bid_item(index=int(index), is_win=False)
-                bid_item[constants.KEY_BID_ITEM_REASON] = common.parse_bid_item_reason(
-                    reason
-                )
-                bid_items.append(bid_item)
+                if isinstance(index, str):
+                    bid_item = common.get_template_bid_item(
+                        index=int(index), is_win=False
+                    )
+                    bid_item[constants.KEY_BID_ITEM_REASON] = (
+                        common.parse_bid_item_reason(reason)
+                    )
+                    bid_items.append(bid_item)
+                # 第三种情况，出现多个标项
+                elif isinstance(index, list):
+                    for i in index:
+                        bid_item = common.get_template_bid_item(
+                            index=int(i), is_win=False
+                        )
+                        bid_item[constants.KEY_BID_ITEM_REASON] = (
+                            common.parse_bid_item_reason(reason)
+                        )
+                        bid_items.append(bid_item)
+
         # 共用一个标项
         else:
             logger.warning(f"废标理由共用：`{tmp}`")

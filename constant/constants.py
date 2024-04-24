@@ -7,121 +7,18 @@ BID_ITEM_AMOUNT_NOT_DEAL = -1
 标项-金额没有成交，即废标
 """
 
+"""
+项目的总金额：废标/终止
+"""
 BID_ITEM_AMOUNT_UNASSIGNED = -2
 """
 标项-金额还没被赋值（初始化ing）
 """
 
 BID_ITEM_BUDGET_UNASSIGNED = -1
-
 """
 标项-预算还未赋值（初始化ing）
 """
-
-BID_ITEM_REASON_UNKNOWN = -2
-"""
-标项-废标理由：未知
-"""
-
-BID_ITEM_REASON_UNASSIGNED = -1
-"""
-标项-废标理由：还未赋值
-"""
-
-BID_ITEM_REASON_NOT_EXIST = 0
-"""
-标项-废标理由不存在，也就是中标了
-"""
-
-BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS = 1
-"""
-标项-废标理由：供应商不足
-"""
-
-BID_ITEM_REASON_BIDDING_DOCUMENTS_AMBIGUITY = 2
-"""
-标项-废标理由：招标文件存在歧义
-"""
-
-BID_ITEM_REASON_ILLEGAL = 3
-"""
-标项-废标理由：存在违规违法行为
-"""
-
-BID_ITEM_REASON_REOPEN = 4
-"""
-标项-废标理由：重新开展采购\n
-ex:\n
-1.因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
-"""
-
-BID_ITEM_REASON_UNABLE_REVIEW = 5
-"""
-标项-废标理由：无法评审\n
-ex:\n
-1.因操作失误，评委人数不符合要求，且系统无法修改，导致项目无法评审，因此流标。
-"""
-
-BID_ITEM_REASON_NOT_PASS_COMPLIANCE_REVIEW = 6
-"""
-标项-废标理由：不通过符合性审查\n
-ex:\n
-1.三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
-"""
-
-BID_ITEM_REASON_MAJOR_CHANGES_AND_CANCEL = 7
-"""
-标项-废标理由：重大变故取消采购
-ex:
-1.因重大变故，采购任务取消
-"""
-
-BID_ITEM_REASON_SUPPLIERS_ALLOCATION_COMPLETED = 8
-"""
-标项-废标理由：供应商已经分配给其他标项，此标项无供应商\n
-ex:\n
-1. 在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，
-    在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，以此类推
-2. 根据中标候选人推荐原则；在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，
-    在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，如排名
-    
-"""
-
-BID_ITEM_REASON_COPYRIGHT_INCONSISTENT = 9
-"""
-标项-废标理由：提供的软件著作权证书均与其投标产品不符\n
-ex:\n
-1. 三家提供的软件著作权证书均与其投标产品不符
-"""
-
-BID_ITEM_REASON_PROCUREMENT_TERMINATION = 10
-"""
-标项-废标理由：终止采购\n
-ex:\n
-1. 本项目应采购人要求，经政府采购监督管理部门同意，终止此次采购。
-"""
-
-BID_ITEM_REASON_UNABLE_QUOTATION_REVIEW = 11
-"""
-标项-废标理由：无法进行报价评审\n
-ex:\n
-1. 本项目在系统生成项目时没有分标项生成，导致报价评审无法进行，故本项目作废标处理
-"""
-
-BID_ITEM_REASON_SUPPLIER_COPY_PROCUREMENT_REQUIREMENTS = 12
-"""
-标项-废标理由：供应商直接复制采购需求\n
-ex:\n
-1. 按照采购文件要求：响应文件承诺不得直接复制采购需求，供货商存在直接复制采购需求现象。
-"""
-
-BID_ITEM_REASON_TENDER_DOCUMENTS_EXIST_SIGNIFICANT_DEFECTS = 13
-"""
-标项-废标理由：招标文件存在重大缺陷\n
-ex:\n
-1.（桂政办发〔2021〕78号）已废止招标文件引用的桂政办发【2015】78 号文内容，招标文件A分标存在重大缺陷应当停止评标工作。
-"""
-
 
 PROJECT_AMOUNT_UNASSIGNED = -1
 """
@@ -129,9 +26,124 @@ PROJECT_AMOUNT_UNASSIGNED = -1
 """
 
 PROJECT_AMOUNT_FAILED = 0
-"""
-项目的总金额：废标/终止
-"""
+
+
+class BidItemReason:
+    """
+    标项-废标理由
+    """
+    UNKNOWN = -2
+    """
+    标项-废标理由：未知
+    """
+
+    UNASSIGNED = -1
+    """
+    标项-废标理由：还未赋值
+    """
+
+    NOT_EXIST = 0
+    """
+    标项-废标理由不存在，也就是中标了
+    """
+
+    NOT_ENOUGH_SUPPLIERS = 1
+    """
+    标项-废标理由：供应商不足
+    """
+
+    BIDDING_DOCUMENTS_AMBIGUITY = 2
+    """
+    标项-废标理由：招标文件存在歧义
+    """
+
+    ILLEGAL = 3
+    """
+    标项-废标理由：存在违规违法行为
+    """
+
+    REOPEN = 4
+    """
+    标项-废标理由：重新开展采购\n
+    ex:\n
+    1.因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
+    """
+
+    UNABLE_REVIEW = 5
+    """
+    标项-废标理由：无法评审\n
+    ex:\n
+    1.因操作失误，评委人数不符合要求，且系统无法修改，导致项目无法评审，因此流标。
+    """
+
+    NOT_PASS_COMPLIANCE_REVIEW = 6
+    """
+    标项-废标理由：不通过符合性审查\n
+    ex:\n
+    1.三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
+    """
+
+    MAJOR_CHANGES_AND_CANCEL = 7
+    """
+    标项-废标理由：重大变故取消采购
+    ex:
+    1.因重大变故，采购任务取消
+    """
+
+    SUPPLIERS_ALLOCATION_COMPLETED = 8
+    """
+    标项-废标理由：供应商已经分配给其他标项，此标项无供应商\n
+    ex:\n
+    1. 在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，
+        在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，以此类推
+    2. 根据中标候选人推荐原则；在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，
+        在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，如排名
+        
+    """
+
+    COPYRIGHT_INCONSISTENT = 9
+    """
+    标项-废标理由：提供的软件著作权证书均与其投标产品不符\n
+    ex:\n
+    1. 三家提供的软件著作权证书均与其投标产品不符
+    """
+
+    PROCUREMENT_TERMINATION = 10
+    """
+    标项-废标理由：终止采购\n
+    ex:\n
+    1. 本项目应采购人要求，经政府采购监督管理部门同意，终止此次采购。
+    """
+
+    UNABLE_QUOTATION_REVIEW = 11
+    """
+    标项-废标理由：无法进行报价评审\n
+    ex:\n
+    1. 本项目在系统生成项目时没有分标项生成，导致报价评审无法进行，故本项目作废标处理
+    """
+
+    SUPPLIER_COPY_PROCUREMENT_REQUIREMENTS = 12
+    """
+    标项-废标理由：供应商直接复制采购需求\n
+    ex:\n
+    1. 按照采购文件要求：响应文件承诺不得直接复制采购需求，供货商存在直接复制采购需求现象。
+    """
+
+    TENDER_DOCUMENTS_EXIST_SIGNIFICANT_DEFECTS = 13
+    """
+    标项-废标理由：招标文件存在重大缺陷\n
+    ex:\n
+    1.（桂政办发〔2021〕78号）已废止招标文件引用的桂政办发【2015】78 号文内容，招标文件A分标存在重大缺陷应当停止评标工作。
+    """
+
+    SUPPLIER_NOT_SUBMIT_RESPONSE_DOCUMENTS = 14
+    """
+    标项-废标理由：供应商未提交响应文件\n
+    ex:\n
+    1. 至响应文件提交截止时间止，供应商未提交响应文件，项目流标
+    2. 至响应文件提交截止时间止，无供应商提交响应文件，根据《中华人民共和国政府采购法》第三十六条规定,本分标废标
+    """
+
 
 # ===================== Scrape Constants ===================
 
@@ -176,7 +188,6 @@ KEY_PROJECT_SCRAPE_TIMESTAMP = "scrape_timestamp"
 """
 项目-爬取公告的时间戳
 """
-
 
 KEY_PROJECT_NAME = "project_name"
 """
@@ -283,7 +294,7 @@ KEY_PURCHASER = "purchaser"
 联系-采购人信息
 """
 
-KEY_PURCHASER_AGENCY= "purchasing_agency"
+KEY_PURCHASER_AGENCY = "purchasing_agency"
 """
 联系-采购代理机构信息
 """
@@ -375,45 +386,106 @@ KEY_TEMP_BASE_INFO = "tmp_base_info"
 调试用：项目基本情况的内容
 """
 
+
 # ========================= part key =====================
-KEY_PART_PROJECT_CODE = 0
-"""
-表示项目编号的part
-"""
 
-KEY_PART_PROJECT_NAME = 1
-"""
-表示项目名称的part
-"""
+class PartKey:
 
-KEY_PART_TERMINATION_REASON = 2
-"""
-表示终止原因的part
-"""
+    PROJECT_CODE = 0
+    """
+    表示项目编号的part
+    """
 
-KEY_PART_WIN_BID = 3
-"""
-表示中标信息的part
-"""
+    PROJECT_NAME = 1
+    """
+    表示项目名称的part
+    """
 
-KEY_PART_NOT_WIN_BID = 4
-"""
-表示未中标信息的part
-"""
+    TERMINATION_REASON = 2
+    """
+    表示终止原因的part
+    """
 
-KEY_PART_CONTACT = 5
-"""
-代表联系方式的part
-"""
+    WIN_BID = 3
+    """
+    表示中标信息的part
+    """
 
-KEY_PART_REVIEW_EXPERT = 6
-"""
-代表评审专家的part
-"""
+    NOT_WIN_BID = 4
+    """
+    表示未中标信息的part
+    """
 
-KEY_PART_PROJECT_SITUATION = 7
-"""
-表示项目基本情况的part
-"""
+    CONTACT = 5
+    """
+    代表联系方式的part
+    """
+
+    REVIEW_EXPERT = 6
+    """
+    代表评审专家的part
+    """
+
+    PROJECT_SITUATION = 7
+    """
+    表示项目基本情况的part
+    """
 
 
+# ==================== stats key ===================
+
+class StatsKey:
+    FILTERED_COUNT = "filter/count"
+    """
+    过滤的公告数量(inc)
+    """
+
+    REDIS_LATEST_TIMESTAMP = "redis/latest_timestamp"
+    """
+    redis 的最新时间戳(set)
+    """
+
+    REDIS_SCRAPED_ANNOUNCEMENT_COUNT = "redis/announcement_count"
+    """
+    redis 的所有公告数量(set)
+    """
+
+    REDIS_UPDATE_PROCESS_ITEM_COUNT = "redis-update/process_items_count"
+    """
+    redis-update组件中处理的所有item(inc)
+    """
+
+    PARSE_ERROR_TOTAL = "parse-error/total"
+    """
+    parse error 的总数量(inc)
+    """
+
+    PARSE_ERROR_DUPLICATED = "parse-error/duplicated"
+    """
+    parse error 的重复数量(inc)
+    """
+
+    PARSE_ERROR_NON_DUPLICATED = "parse-error/non-duplicated"
+    """
+    parse error 的非重复数量(inc)
+    """
+
+    COLLECT_KAFKA_SEND_COUNT = "collect-kafka/send_count"
+    """
+    collect-kafka 组件中发送到 kafka 的公告数量(inc)
+    """
+
+    COLLECT_KAFKA_SEND_FAILED_COUNT = "collect-kafka/send_failed_count"
+    """
+    collect-kafka 组件中发送到 kafka 失败的公告数量(inc)
+    """
+
+    SPIDER_PLANNED_CRAWL_COUNT = "bidding/planned_crawl_count"
+    """
+    计划爬取的公告总数(set)
+    """
+
+    SPIDER_ACTUAL_CRAWL_COUNT = "bidding/actual_crawl_count"
+    """
+    已经爬取的数量，包括已经过滤的(inc)
+    """

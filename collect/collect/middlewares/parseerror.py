@@ -179,9 +179,9 @@ class ParseErrorHandlerMiddleware:
         self.pickle_path = os.path.join(self.log_dir, self.PICKLE_FILE_NAME)
         self.json_path = os.path.join(self.log_dir, self.JSON_FILE_NAME)
 
-        crawler.stats.set_value("parse_error/total", 0)
-        crawler.stats.set_value("parse_error/duplicated", 0)
-        crawler.stats.set_value("parse_error/non_repeat", 0)
+        crawler.stats.set_value(constants.StatsKey.PARSE_ERROR_TOTAL, 0)
+        crawler.stats.set_value(constants.StatsKey.PARSE_ERROR_DUPLICATED, 0)
+        crawler.stats.set_value(constants.StatsKey.PARSE_ERROR_NON_DUPLICATED, 0)
         logger.debug(
             f"Using config(PARSE_ERROR_LOG_DIR={self.log_dir})",
         )
@@ -286,24 +286,29 @@ class ParseErrorHandlerMiddleware:
             exception: ParseError
             complete_error(exception, response)
             url = response.url
-            spider.crawler.stats.inc_value("parse_error/total")
-            articleId = self._check_url_duplicated(url)
-            if not articleId:
+            # 总数+1
+            spider.crawler.stats.inc_value(constants.StatsKey.PARSE_ERROR_TOTAL)
+            article_id = self._check_url_duplicated(url)
+            if not article_id:
                 logger.warning(
                     f"catch a duplicated parse error:\n"
                     f"id: {exception.article_id}\n"
                     f"msg: {exception.message}"
                 )
-                spider.crawler.stats.inc_value("parse_error/duplicated")
+                # 重复+1
+                spider.crawler.stats.inc_value(
+                    constants.StatsKey.PARSE_ERROR_DUPLICATED
+                )
             else:
                 logger.warning(
                     f"catch a parse error:\n"
                     f"id: {exception.article_id}\n"
                     f"msg: {exception.message}"
                 )
-                spider.crawler.stats.inc_value("parse_error/non_repeat")
+                # 非重复+1
+                spider.crawler.stats.inc_value(constants.StatsKey.PARSE_ERROR_NON_DUPLICATED)
                 self.exceptions["error"].append(exception)
-                self.articleIds.add(articleId)
+                self.articleIds.add(article_id)
             logger.exception(exception)
             return []
 

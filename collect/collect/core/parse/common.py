@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Union
+from typing import Union, Callable
 
 from lxml import etree
 
@@ -18,6 +18,7 @@ __all__ = [
     "startswith_number_index",
     "parse_review_experts",
     "parse_html",
+    "split_content_by_titles",
 ]
 
 filter_rules = [
@@ -48,6 +49,86 @@ chinese_number_mapper = {
     "十八": 18,
     "十九": 19,
     "二十": 20,
+    "二十一": 21,
+    "二十二": 22,
+    "二十三": 23,
+    "二十四": 24,
+    "二十五": 25,
+    "二十六": 26,
+    "二十七": 27,
+    "二十八": 28,
+    "二十九": 29,
+    "三十": 30,
+    "三十一": 31,
+    "三十二": 32,
+    "三十三": 33,
+    "三十四": 34,
+    "三十五": 35,
+    "三十六": 36,
+    "三十七": 37,
+    "三十八": 38,
+    "三十九": 39,
+    "四十": 40,
+    "四十一": 41,
+    "四十二": 42,
+    "四十三": 43,
+    "四十四": 44,
+    "四十五": 45,
+    "四十六": 46,
+    "四十七": 47,
+    "四十八": 48,
+    "四十九": 49,
+    "五十": 50,
+    "五十一": 51,
+    "五十二": 52,
+    "五十三": 53,
+    "五十四": 54,
+    "五十五": 55,
+    "五十六": 56,
+    "五十七": 57,
+    "五十八": 58,
+    "五十九": 59,
+    "六十": 60,
+    "六十一": 61,
+    "六十二": 62,
+    "六十三": 63,
+    "六十四": 64,
+    "六十五": 65,
+    "六十六": 66,
+    "六十七": 67,
+    "六十八": 68,
+    "六十九": 69,
+    "七十": 70,
+    "七十一": 71,
+    "七十二": 72,
+    "七十三": 73,
+    "七十四": 74,
+    "七十五": 75,
+    "七十六": 76,
+    "七十七": 77,
+    "七十八": 78,
+    "七十九": 79,
+    "八十": 80,
+    "八十一": 81,
+    "八十二": 82,
+    "八十三": 83,
+    "八十四": 84,
+    "八十五": 85,
+    "八十六": 86,
+    "八十七": 87,
+    "八十八": 88,
+    "八十九": 89,
+    "九十": 90,
+    "九十一": 91,
+    "九十二": 92,
+    "九十三": 93,
+    "九十四": 94,
+    "九十五": 95,
+    "九十六": 96,
+    "九十七": 97,
+    "九十八": 98,
+    "九十九": 99,
+    "一百": 100,
 }
 
 chinese_numbers: list = list(chinese_number_mapper.keys())
@@ -175,8 +256,9 @@ def check_unuseful_announcement(announcement_type: int) -> bool:
 def parse_review_experts(part: list[str]) -> dict:
     """
     通用的 “评审小组” 部分解析
-    :param part: 返回包含 `constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE` 和 `constants.KEY_PROJECT_REVIEW_EXPERT` 的dict（不为空）
-    :return:
+    :param part:
+    :return: 返回包含 ``constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE``
+                和 ``constants.KEY_PROJECT_REVIEW_EXPERT`` 的dict（不为空）
     """
     data = dict()
 
@@ -272,9 +354,9 @@ def get_template_bid_item(is_win: bool, index: int, name: str = None) -> dict:
         constants.KEY_BID_ITEM_SUPPLIER_ADDRESS: None,
         # 废标原因
         constants.KEY_BID_ITEM_REASON: (
-            constants.BID_ITEM_REASON_NOT_EXIST
+            constants.BidItemReason.NOT_EXIST
             if is_win
-            else constants.BID_ITEM_REASON_UNASSIGNED
+            else constants.BidItemReason.UNASSIGNED
         ),
     }
 
@@ -286,7 +368,8 @@ def parse_bid_item_reason(reason: str) -> int:
     # 3.投标供应商(数量不符合)要求,系统自动废标
     # 4.通过符合性审查的投标人(不足3家)，作废标处理。
     # 5.至投标截止时间，提交投标文件的投标人(少于三家)，本项目流标，由采购人依法重新招标
-    # 6.经公开唱标，B分标无投标人参与投标，该分标采购失败。
+    # 6.经公开唱标，B分标(无投标人参与)投标，该分标采购失败。
+    # 7.本项目1、2分标投标文件提交截止时间后提交投标文件的供应商(不足三家)，本项目废标
     if (
         (
             ("三家" in reason or "3家" in reason)
@@ -295,28 +378,28 @@ def parse_bid_item_reason(reason: str) -> int:
         or ("数量不符合" in reason)
         or ("无投标人参与" in reason)
     ):
-        return constants.BID_ITEM_REASON_NOT_ENOUGH_SUPPLIERS
+        return constants.BidItemReason.NOT_ENOUGH_SUPPLIERS
 
     # 1. "评标委员会发现招标文件存在歧义，故本次采购活动作废标处理。
     if "存在歧义" in reason and "招标文件" in reason:
-        return constants.BID_ITEM_REASON_BIDDING_DOCUMENTS_AMBIGUITY
+        return constants.BidItemReason.BIDDING_DOCUMENTS_AMBIGUITY
 
     # 1. 出现影响采购公正的违法、违规行为
     if "违法、违规行为" in reason:
-        return constants.BID_ITEM_REASON_ILLEGAL
+        return constants.BidItemReason.ILLEGAL
 
     # 1. 因电子签章原因，资格审查中投标人了出现了几种签章的形式，采购人为了本项目更加公正公开公平，决定废标，重新开展采购;
     if "重新开展采购" in reason:
-        return constants.BID_ITEM_REASON_REOPEN
+        return constants.BidItemReason.REOPEN
 
     # 1. 因操作失误，评委人数不符合要求，且系统无法修改，导致项目无法评审，因此流标。
     # 2. 无法进行评审
     if ("无法评审" in reason) or ("无法进行评审" in reason):
-        return constants.BID_ITEM_REASON_UNABLE_REVIEW
+        return constants.BidItemReason.UNABLE_REVIEW
 
     # 1. 三家提供的软件著作权证书均与其投标产品不符。不通过符合性审查
     if "不通过符合性审查" in reason:
-        return constants.BID_ITEM_REASON_NOT_PASS_COMPLIANCE_REVIEW
+        return constants.BidItemReason.NOT_PASS_COMPLIANCE_REVIEW
 
     # 1. 因(重大变故)，(采购)任务(取消)
     # 2. 因项目(重大变故)，(取消)本次(采购)
@@ -326,33 +409,41 @@ def parse_bid_item_reason(reason: str) -> int:
         and ("采购" in reason)
         and ("取消" in reason or "终止" in reason)
     ):
-        return constants.BID_ITEM_REASON_MAJOR_CHANGES_AND_CANCEL
+        return constants.BidItemReason.MAJOR_CHANGES_AND_CANCEL
 
     # 1. 在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，以此类推
     # 2. 根据中标候选人推荐原则；在项目评审中，排名第一的中标侯选供应商在本项目本分标中取得本分标的第一中标侯选供应商资格的，在接下来的分标中将不能再取得第一中标候选供应商资格，但能参与接下来分标的评审，如排名
     if "不能再取得第一中标候选供应商资格" in reason:
-        return constants.BID_ITEM_REASON_SUPPLIERS_ALLOCATION_COMPLETED
+        return constants.BidItemReason.SUPPLIERS_ALLOCATION_COMPLETED
 
     # 1. 三家提供的(软件著作权)证书均与其投标产品(不符)
     if "软件著作权" in reason and "不符" in reason:
-        return constants.BID_ITEM_REASON_COPYRIGHT_INCONSISTENT
+        return constants.BidItemReason.COPYRIGHT_INCONSISTENT
 
     # 1. 本项目应采购人要求，经政府采购监督管理部门同意，(终止)此次(采购)。
     if "终止" in reason and "采购" in reason:
-        return constants.BID_ITEM_REASON_PROCUREMENT_TERMINATION
+        return constants.BidItemReason.PROCUREMENT_TERMINATION
 
     # 1.本项目在系统生成项目时没有分标项生成，导致(报价评审无法进行)，故本项目作废标处理
     if "报价评审" in reason and "无法进行" in reason:
-        return constants.BID_ITEM_REASON_UNABLE_QUOTATION_REVIEW
+        return constants.BidItemReason.UNABLE_QUOTATION_REVIEW
 
     # 1. 按照采购文件要求：响应文件承诺不得直接复制采购需求，供货商存在直接复制采购需求现象
     if "直接复制" in reason and "采购需求" in reason:
-        return constants.BID_ITEM_REASON_SUPPLIER_COPY_PROCUREMENT_REQUIREMENTS
+        return constants.BidItemReason.SUPPLIER_COPY_PROCUREMENT_REQUIREMENTS
 
     # 1. （桂政办发〔2021〕78号）已废止招标文件引用的桂政办发【2015】78 号文内容，招标文件A分标存在重大缺陷应当停止评标工作。
     if "招标文件" in reason and "存在" in reason and "缺陷" in reason:
-        return constants.BID_ITEM_REASON_TENDER_DOCUMENTS_EXIST_SIGNIFICANT_DEFECTS
+        return constants.BidItemReason.TENDER_DOCUMENTS_EXIST_SIGNIFICANT_DEFECTS
 
+    # 1.至响应文件提交截止时间止，(供应商)(未提交响应文件)，项目流标
+    # 2. 至响应文件提交截止时间止，(无供应商)(提交响应文件)，根据《中华人民共和国政府采购法》第三十六条规定,本分标废标
+    if (
+        "供应商" in reason
+        and ("无供应商" in reason or "未提交" in reason)
+        and "响应文件" in reason
+    ):
+        return constants.BidItemReason.SUPPLIER_NOT_SUBMIT_RESPONSE_DOCUMENTS
 
     raise ParseError(msg=f"无法解析废标原因: {reason}", content=[reason])
 
@@ -374,7 +465,7 @@ def parse_contact_info(part: str) -> dict:
     :return:
     """
     # 替换掉无用字符，避免干扰正则表达式
-    part = part.replace(" ", "").replace(" ", "").replace("\u3000", "")
+    part = sym.remove_all_spaces(part)
 
     data = dict()
     if match := PATTERN_PURCHASER.search(part):
@@ -446,35 +537,13 @@ def _merge_bid_items(
     for p_idx in range(n):
         purchase_item = _purchase[p_idx]
         purchase_index = purchase_item[constants.KEY_BID_ITEM_INDEX]
-        # 将空格去掉
-        purchase_item_name: Union[str, None] = purchase_item.get(constants.KEY_BID_ITEM_NAME, None)
-        if purchase_item_name:
-            purchase_item_name.replace(" ", "")
 
         # 同一个标项 purchase_item 可能有多个 result_item 对应
         while (
-                r_idx < result_len
-                and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
+            r_idx < result_len
+            and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
         ):
             result_item = _result[r_idx]
-
-            result_item_name: Union[None, str] = result_item.get(
-                constants.KEY_BID_ITEM_NAME, None
-            )
-            if result_item_name:
-                result_item_name.replace(" ", "")
-
-            # 标项名称不一致
-            if (
-                result_item_name and result_item_name != purchase_item_name
-            ):
-                raise ParseError(
-                    msg="标项名称不一致",
-                    content=[
-                        f"purchase item: {purchase_item}",
-                        f"result item: {result_item}"
-                    ],
-                )
             # 标项名称
             result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
                 constants.KEY_BID_ITEM_NAME
@@ -665,3 +734,106 @@ def make_item(data: dict, purchase_data: Union[dict, None]):
         constants.KEY_PROJECT_TERMINATION_REASON, None
     )
     return item
+
+
+@stats.function_stats(logger, log_params=True)
+def split_content_by_titles(
+    result: list[str],
+    is_win_bid: bool,
+    check_title: Callable[[bool, str], int],
+) -> dict[int, list[str]]:
+    """
+    根据标题来分片段
+    :param result:
+    :param is_win_bid:
+    :param check_title:
+    :return:
+    """
+    # chinese_number_index 用于规定顺序，避免某些特殊情况
+    n, idx, chinese_number_index = len(result), 0, 0
+    # 分解的片段
+    parts = dict[int, list[str]]()
+
+    while idx < n:
+        title = result[idx]
+
+        # 存在情况：“中文数字” 和 后面部分的标题内容 “、xxx” 是分开的
+        if translate_zh_to_number(title) > chinese_number_index:
+            # 检测第二行
+            if idx + 1 < n and result[idx + 1].startswith("、"):
+                title += result[idx + 1]
+                result.pop(idx + 1)
+                n -= 1
+
+        # 找以 “一、” 这种格式开头的字符串
+        index = startswith_chinese_number(title)
+        # 需要在上次解析的序号后面
+        if index > chinese_number_index:
+            # 标题是否为已经完善
+            completed = False
+
+            # 存在一种废标情况，标题为 “二、项目废标的原因”，但是文本分开，需要特殊处理
+            if not is_win_bid:
+                length = len(result[idx])
+                if length < 9 and index == 2 and result[idx][2:].startswith("项目"):
+                    tmp_idx = idx
+                    # 往下查找直到长度满足
+                    while idx < n and length < 9:
+                        idx += 1
+                        length += len(result[idx])
+                    else:
+                        # 拼接
+                        result[idx] = "".join(result[tmp_idx : idx + 1])
+                        completed = True
+
+            # 存在一种情况，“中文数字、”和后面的标题内容分开，也就是 '、' 是最后一个字符
+            if not completed:
+                if title[-1].endswith("、"):
+                    title += result[idx + 1]
+                    result.pop(idx + 1)
+                    n -= 1
+                    completed = True
+
+            # 标题长度少于4则继续拼接
+            while len(title) - 2 < 4 and idx + 1 < n:
+                title += result[idx + 1]
+                result.pop(idx + 1)
+                n -= 1
+
+            # 检查 标题
+            key_part = check_title(is_win_bid, title)
+            if key_part:
+                chinese_number_index = index
+
+                # 某些标题可能和后面的内容连成一块，需要分开
+                if symbol := sym.get_symbol(
+                    result[idx], (":", "："), raise_error=False
+                ):
+                    sym_idx = result[idx].index(symbol)
+                    # 如果冒号不是最后一个字符
+                    if sym_idx < len(result[idx]) - 1:
+                        result.insert(idx + 1, result[idx][sym_idx + 1:])
+                        n += 1
+
+                # 开始部分(不记入标题）
+                idx += 1
+                pre = idx
+                while idx < n and (
+                    # 单个中文
+                    translate_zh_to_number(result[idx]) < chinese_number_index + 1
+                    and
+                    (   # 不以 ‘中文数字、’ 开头
+                        (zh_idx := startswith_chinese_number(result[idx])) == -1
+                        or
+                        # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                        zh_idx < chinese_number_index + 1
+                    )
+                ):
+                    idx += 1
+                # 加入片段
+                parts[key_part] = result[pre:idx]
+            else:
+                idx += 1
+        else:
+            idx += 1
+    return parts

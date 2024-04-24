@@ -59,8 +59,8 @@ EXTENSIONS = {"collect.extensions.LogStats": 300}
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     "collect.pipelines.CollectKafkaPipeline": 300,
-    # "collect.pipelines.DebugPipeline": 200,
     "collect.pipelines.UpdateRedisInfoPipeline": 200,
+    # "collect.pipelines.DebugPipeline": 200,
     # "collect.pipelines.DebugWritePipeline": 100,
 }
 

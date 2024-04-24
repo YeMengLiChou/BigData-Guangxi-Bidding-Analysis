@@ -1,6 +1,8 @@
+import re
 import typing
-import typing_extensions
-from typing import Union, Type
+from typing import Union
+
+PATTERN_REPLACE_SPACE = re.compile(r"[\s\u3000 ]")
 
 
 def get_comma_symbol(s: str) -> Union[str, None]:
@@ -17,7 +19,7 @@ def get_comma_symbol(s: str) -> Union[str, None]:
 
 
 def get_symbol(
-    s: str, candidates: typing.Iterable[str], raise_error: bool = True
+        s: str, candidates: typing.Iterable[str], raise_error: bool = True
 ) -> Union[str, None]:
     """
     从 coordinators 中获取 s 中存在的符号
@@ -57,3 +59,12 @@ def endswith_colon_symbol(s: str) -> bool:
     """
     s = s.strip()
     return s.endswith("：") or s.endswith(":")
+
+
+def remove_all_spaces(string: str) -> str:
+    """
+    移除字符串中的所有空格
+    :param string:
+    :return:
+    """
+    return PATTERN_REPLACE_SPACE.sub("", string)

@@ -8,6 +8,7 @@ import scrapy
 from scrapy import signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
+from twisted.python.failure import Failure
 from typing_extensions import Self
 
 from collect.collect.core.api.category import CategoryApi
@@ -24,6 +25,18 @@ from utils import debug_stats as stats
 from constant import constants
 
 logger = logging.getLogger(__name__)
+
+# 最大的时间戳，用于计算优先级
+MAX_TIMESTAMP = 3000000000000
+
+
+def get_request_priority(timestamp: int):
+    """
+    通过时间戳计算优先级，时间越早则优先级越高
+    :param timestamp:
+    :return:
+    """
+    return MAX_TIMESTAMP - timestamp
 
 
 def get_article_id_from_url(url: str) -> str:
@@ -45,12 +58,14 @@ def _make_detail_request(article_id: str, callback: callable, meta: dict):
     :param meta:
     :return:
     """
+    scraped_timestamp = meta.get(constants.KEY_PROJECT_SCRAPE_TIMESTAMP, 0)
     return scrapy.Request(
         url=DetailApi.get_complete_url(article_id),
         callback=callback,
         method=DetailApi.method,
         meta=meta,
         dont_filter=True,
+        priority=get_request_priority(scraped_timestamp),
     )
 
 
@@ -174,15 +189,19 @@ class BiddingSpider(scrapy.Spider):
             f"publish_date_begin: {self.publish_date_begin}\n"
             f"publish_date_end: {self.publish_date_end}"
         )
+        self.debug = False
+
         # 读取特殊article_id
         module = importlib.import_module("collect.collect.spiders.error_article_ids")
         if ids := getattr(module, "ids", None):
             self.special_article_ids = ids
             logger.warning(self.special_article_ids)
-            # 如果存在需要测试的id， 那么清楚 redis 中的内容
-            if len(self.special_article_ids) > 0:
-                redis.clear_latest_announcement_timestamp()
-                redis.delete_all_article_ids()
+
+        # 如果存在需要测试的id， 那么清楚 redis 中的内容
+        if len(self.special_article_ids) > 0:
+            redis.clear_latest_announcement_timestamp()
+            redis.delete_all_article_ids()
+            self.debug = True
 
     def spider_closed(self):
         stats.log_stats_collector()
@@ -218,6 +237,39 @@ class BiddingSpider(scrapy.Spider):
         # ("Zq/T/LwmDS54RA5CZferSw==", False),  # 出现 “流标理由”
         # ("RWaFA6UZ54ytuJL5AsxQvQ==", False),  # parts 不足
         # ("6su4NhHpSMAGAJQcausoSw==", False),  # parts 不足
+        # ("jUFkBMpf2uk8cO8ijgbvSA==", False),
+        # ("s/ASbAPR4hM9jtyq2dRV/w==", True),
+        # ("f8rdctGhrdbbAknOEeDMYw==", True),
+        # ("qFpCzaXnHSQvh790iUV3BA==", False),
+        # ("MN3ZxA9/8/g4pl7kKjrhAQ==", False),
+        # ("yVQkBa/S5gjCS+Wo5a/uHQ==", True),
+        # ("TMJIaEmoGeGNw+SiFMYq3Q==", True),
+        # ("qc5WYAYyrg4+SgqQkq7X+Q==", False),  # 评审专家信息出现不符合所需的格式（未解决）
+        # ("cxTkJqERmdb2qXt13qSDWQ==", True),  # 评审专家出现问题（未解决）
+        # ("T4VzPFZB/HmUD9iDXSoi7Q==", True),  # 评审专家出现问题（未解决）
+        # ("Oq2TLfohRLSDv5NXT/Va5g==", True),  # 评审专家出现问题（未解决）
+        # ("IH8Vnux6cJnOWI/RJ7vAIw==", True),  # 评审专家出现问题（未解决）
+        # ("hIJqsMp244oLSghWB+DKnQ==", True),  # 评审专家出现问题（未解决）
+        # ("TDbW1N2IglUbO8Y2B1n5KQ==", True),  # 评审专家出现问题（未解决）
+        # ("hJXPPS4FgL+RplTxqA0nEA==", True),  # 评审专家出现问题（未解决）
+        # ("vbysZXBiFUf1Zaq7ZJkSvQ==", True),  # 评审专家出现问题（未解决）
+        # ("bDiMVrCgJDoJlCN1ksVgow==", True),  # 评审专家出现问题（未解决）
+        # ("aa7rPDy14qLLA1q7LGsiUA==", True),  # 评审专家出现问题（未解决）
+        # ("DyIKxKG5FBA2lBamFkR2rg==", True),  # 评审专家出现问题（未解决）
+        # ("93/GxfWwx4ZCQdLDPP08NQ==", True),  # 评审专家出现问题（未解决）
+        # ("JoZPYxylSynsFRsRGvlP3Q==", True),  # 评审专家出现问题（未解决）
+        # ("MPnTH8Rh8cNkG9DuPBMwRQ==", True),  # 评审专家出现问题（未解决）
+        # ("mD0f42nXtRm/dIFqnwqq1Q==", True),  # 评审专家出现问题（未解决）
+        # ("Fq+aDxeiir5UmcV28j3C3g==", True),  # 评审专家出现问题（未解决）
+        # ("Msg4SEqlEcUOgyvNfKavHA==", True),  # 评审专家出现问题（未解决）
+        # ("VAEDQU7LPHxmGmFiGBj2pA==", True),  # 标项预算合计与总预算不符
+        # ("I3xK1ZPz0Teg0AL6qTN42g==", False),  # 标项预算合计与总预算不符
+        # ("QPMTDHc/WAtP8JMV0/LTlg==", False),  # 废标结果出现新格式
+
+
+
+
+
     ]
 
     #  =========================================
@@ -229,6 +281,7 @@ class BiddingSpider(scrapy.Spider):
         page_size: int,
         callback: callable,
         dont_filter: bool = False,
+        priority: int = 0,
     ):
         """
         生成结果列表的请求
@@ -251,6 +304,8 @@ class BiddingSpider(scrapy.Spider):
             ),
             headers={"Content-Type": "application/json;charset=UTF-8"},
             dont_filter=dont_filter,
+            priority=priority,
+            errback=self.handle_result_request_error
         )
 
     def start_requests(self):
@@ -283,6 +338,7 @@ class BiddingSpider(scrapy.Spider):
                 page_size=1,
                 callback=self.parse_result_amount,
                 dont_filter=True,
+                priority=get_request_priority(0),
             )
 
     @stats.function_stats(logger)
@@ -297,12 +353,18 @@ class BiddingSpider(scrapy.Spider):
         if success:
             total = int(data["result"]["data"]["total"])
             self.logger.debug(f"initial fetch amount: {total}")
-            for i in range(1, total // 100 + 2):
+            self.crawler.stats.set_value(
+                constants.StatsKey.SPIDER_PLANNED_CRAWL_COUNT, total
+            )
+            # 从后面开始爬取
+            end = total // 100 + (0 if total % 100 == 0 else 1)
+            for i in range(end, 0, -1):
                 yield self._make_result_request(
                     page_no=i,
                     page_size=100,
                     callback=self.parse_result_data,
                     dont_filter=True,
+                    priority=get_request_priority(-i),  # 优先级最高，i越大应该越先爬取
                 )
         else:
             self.logger.error(f"response not success: {response.text}")
@@ -319,6 +381,17 @@ class BiddingSpider(scrapy.Spider):
             response_data = response_body["result"]["data"]
             # 该数据为一个列表
             data: list = response_data["data"]
+
+            if data is None:
+                logger.warning(f"结果列表apip返回结果data为None {response.meta}")
+                return
+
+            # 统计已经爬取到的公告数量
+            self.crawler.stats.inc_value(
+                constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT,
+                len(data),
+            )
+
             # 对于列表中的每个公告数据，都拿到所需要的数据 meta，进而生成对应的请求
             for meta in result.parse_response_data(data):
                 article_id = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
@@ -391,7 +464,8 @@ class BiddingSpider(scrapy.Spider):
                 return
             else:
                 # 没有出现 SwitchError 则解析采购公告
-                purchase_article_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+                purchase_article_ids = meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, [])
+
                 if len(purchase_article_ids) == 0:
                     # 没有 “采购公告”，直接进入 make_item 生成 item
                     try:

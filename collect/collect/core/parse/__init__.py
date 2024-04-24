@@ -57,7 +57,7 @@ def parse_amount_and_percent(
     :param string:
     :return:
     """
-    string = string.strip()
+    string = symbol_tools.remove_all_spaces(string)
     # 格式：数字+单位
     if match := PATTERN_NUMBER_UNIT.fullmatch(string):
         amount_text, unit = match.groups()

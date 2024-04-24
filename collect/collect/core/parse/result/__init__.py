@@ -6,9 +6,8 @@ from collect.collect.core import error
 from collect.collect.core.parse import common, errorhandle
 from collect.collect.core.parse.result import not_win, win
 from collect.collect.middlewares import ParseError
-from utils import symbol_tools
-from utils import debug_stats as stats
 from constant import constants
+from utils import debug_stats as stats
 
 try:
     from .not_win import parse_not_win_bid
@@ -69,7 +68,8 @@ def parse_response_data(data: list):
             )
 
     result = []
-    for item in data:
+    for idx in range(len(data) - 1, -1, -1):
+        item = data[idx]
         announcement_type = check_useful_announcement(item["pathName"])
         if announcement_type == __ANNOUNCEMENT_TYPE_UNUSEFUL:
             continue
@@ -116,33 +116,35 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
     """
     # 项目编号部分
     if "项目编号" in title:
-        return constants.KEY_PART_PROJECT_CODE
+        return constants.PartKey.PROJECT_CODE
 
     # 项目编号部分
     if "项目名称" in title:
-        return constants.KEY_PART_PROJECT_NAME
+        return constants.PartKey.PROJECT_NAME
 
     # 评审部分
     if "评审" in title:
-        return constants.KEY_PART_REVIEW_EXPERT
+        return constants.PartKey.REVIEW_EXPERT
 
     # 联系方式部分
     if "以下方式联系" in title or "联系方式" in title:
-        return constants.KEY_PART_CONTACT
+        return constants.PartKey.CONTACT
 
     if is_win:
         # 中标结果部分
-        if "中标（成交）信息" in title or "中标信息" in title:
-            return constants.KEY_PART_WIN_BID
+        if "中标（成交）信息" in title or "中标信息" in title or "成交信息" in title:
+            return constants.PartKey.WIN_BID
     else:
         # 废标结果部分
-        if (("废标" in title or "流标") and ("原因" in title or "理由" in title)) or (
-            "采购结果信息" in title
+        if (
+            (("废标" in title or "流标") and ("原因" in title or "理由" in title))
+            or ("采购结果信息" in title)
+            or ("结果信息" in title)
         ):
-            return constants.KEY_PART_NOT_WIN_BID
+            return constants.PartKey.NOT_WIN_BID
         # 终止原因
         if "终止" in title:
-            return constants.KEY_PART_TERMINATION_REASON
+            return constants.PartKey.TERMINATION_REASON
     return None
 
 
@@ -155,87 +157,31 @@ def parse_html(html_content: str, is_win_bid: bool):
     :return:
     """
     result = common.parse_html(html_content=html_content)
-
-    n, idx, parts = len(result), 0, dict[int, list[str]]()
-    # chinese_number_index 用于规定顺序，避免某些特殊情况
-    project_data, chinese_number_index = dict(), 0
+    parts: Union[dict[int, list[str]], None] = None
+    project_data = dict()
     try:
-        while idx < n:
-            # 找以 “一、” 这种格式开头的字符串
-            index = common.startswith_chinese_number(result[idx])
-            if index > chinese_number_index:
-
-                # 存在一种废标情况，标题为 “二、项目废标的原因”，但是文本分开，需要特殊处理
-                if not is_win_bid:
-                    length = len(result[idx])
-                    if length < 9 and index == 2 and result[idx][2:].startswith("项目"):
-                        tmp_idx = idx
-                        # 往下查找直到长度满足
-                        while idx < n and length < 9:
-                            idx += 1
-                            length += len(result[idx])
-                        else:
-                            # 拼接
-                            result[idx] = "".join(result[tmp_idx : idx + 1])
-
-                # 存在一种情况，“中文数字、”和后面的标题内容分开，也就是 '、' 是最后一个字符
-                if result[idx][-1] == "、":
-                    result[idx] += result[idx + 1]
-                    result.pop(idx + 1)
-                    n -= 1
-
-                key_part = check_useful_part(is_win=is_win_bid, title=result[idx])
-                # 该部分为所需要的标题信息
-                if key_part:
-                    chinese_number_index = index
-
-                    # 某些标题可能和后面的内容连成一块，需要分开
-                    if sym := symbol_tools.get_symbol(
-                        result[idx], (":", "："), raise_error=False
-                    ):
-                        sym_idx = result[idx].index(sym)
-                        # 如果冒号不是最后一个字符
-                        if sym_idx < len(result[idx]) - 1:
-                            result.insert(idx + 1, result[idx][sym_idx + 1 :])
-                            n += 1
-
-                    # 项目编号从 purchase 移动到此处
-                    if key_part == constants.KEY_PART_PROJECT_CODE:
-                        project_data[constants.KEY_PROJECT_CODE] = result[idx + 1]
-                        idx += 2
-                        continue
-
-                    # 项目名称从 purchase 移动到此处
-                    if key_part == constants.KEY_PART_PROJECT_NAME:
-                        project_data[constants.KEY_PROJECT_NAME] = result[idx + 1]
-                        idx += 2
-                        continue
-
-                    # 开始部分(不记入标题）
-                    idx += 1
-                    pre = idx
-                    while idx < n and (
-                        # 单个中文
-                        common.translate_zh_to_number(result[idx]) != index + 1
-                        and
-                        # 不以 ‘中文数字、’ 开头
-                        (
-                            (zh_idx := common.startswith_chinese_number(result[idx]))
-                            == -1
-                            and zh_idx != index + 1
-                        )
-                    ):
-                        idx += 1
-                    # 将该部分加入
-                    parts[key_part] = result[pre:idx]
-                else:
-                    idx += 1
-            else:
-                idx += 1
+        # 分解片段
+        parts = common.split_content_by_titles(
+            result=result,
+            is_win_bid=is_win_bid,
+            check_title=check_useful_part,
+        )
+        # print(json.dumps(parts, ensure_ascii=False, indent=4))
     except BaseException as e:
         errorhandle.raise_error(e, "解析 parts 异常", result)
 
     try:
+        # 项目编号从 purchase 移动到此处
+        if constants.PartKey.PROJECT_CODE in parts:
+            project_data[constants.KEY_PROJECT_CODE] = "".join(
+                parts[constants.PartKey.PROJECT_CODE]
+            )
+        # 项目名称从 purchase 移动到此处
+        if constants.PartKey.PROJECT_NAME in parts:
+            project_data[constants.KEY_PROJECT_NAME] = "".join(
+                parts[constants.PartKey.PROJECT_NAME]
+            )
+
         # 成交公告，中标结果
         if is_win_bid:
             data = win.parse_win_bid(parts)
@@ -262,7 +208,6 @@ def parse_html(html_content: str, is_win_bid: bool):
 
 
 if __name__ == "__main__":
-    content = \
-        ""
+    content = ""
     res = parse_html(content, False)
     print(json.dumps(res, ensure_ascii=False, indent=4))

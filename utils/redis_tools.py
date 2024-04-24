@@ -100,13 +100,20 @@ def clear_latest_announcement_timestamp():
 # --------------------- ARTICLE IDS --------------------- #
 
 
-def add_unique_article_ids(*article_ids: str) -> bool:
+def add_unique_article_ids(article_ids: Union[str, list[str]]) -> bool:
     """
     添加唯一的公告结果 ID
     :param article_ids: 公告结果 ID
     :return: 是否添加成功
     """
-    return _client.sadd(KEY_ANNOUNCEMENT_ARTICLE_IDS, *article_ids) == len(article_ids)
+    if article_ids is None:
+        return False
+    if isinstance(article_ids, str):
+        return _client.sadd(KEY_ANNOUNCEMENT_ARTICLE_IDS, article_ids) == 1
+    elif isinstance(article_ids, list):
+        if len(article_ids) == 0:
+            return True
+        return _client.sadd(KEY_ANNOUNCEMENT_ARTICLE_IDS, *article_ids) == len(article_ids)
 
 
 def remove_article_id(article_id: str) -> bool:
@@ -143,4 +150,7 @@ def delete_all_article_ids():
 
 
 if __name__ == "__main__":
-    print(_client.smembers(KEY_ANNOUNCEMENT_ARTICLE_IDS))
+    # print(_client.smembers(KEY_ANNOUNCEMENT_ARTICLE_IDS))
+    res = add_unique_article_ids([])
+    print(res)
+

@@ -60,7 +60,7 @@ def _init_producer():
     return KafkaProducer(
         bootstrap_servers=[server],
         value_serializer=lambda x: x.encode("utf-8"),
-        key_serializer=lambda x: x.encode("utf-8"),
+        key_serializer=lambda x: x.encode("utf-8") if x else x,
         retries=3,
         compression_type="gzip",
     )
@@ -133,12 +133,15 @@ def create_topic(topic: str):
     return response.topic_errors[0][1] == 0  # verify error code
 
 
-def send_item_to_kafka(item: Union[dict, str]):
+def send_item_to_kafka(item: Union[dict, str]) -> bool:
     """
     发送 item 数据到 kafka 队列中
     :param item:
     :return:
     """
+    if item is None:
+        return False
+
     if isinstance(item, dict):
         value = json.dumps(item, ensure_ascii=False)
     elif isinstance(item, str):

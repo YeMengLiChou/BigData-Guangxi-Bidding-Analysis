@@ -6,6 +6,7 @@ from scrapy import Request, Spider
 from scrapy.crawler import Crawler
 from scrapy.exceptions import IgnoreRequest
 
+import constant.constants
 from utils import redis_tools as redis
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class ArticleIdFilterDownloadMiddleware:
 
     def __init__(self, stats: scrapy.crawler.StatsCollector):
         self.stats = stats
-        self.stats.set_value("filtered_count", 0)
+        self.stats.set_value(constant.constants.StatsKey.FILTERED_COUNT, 0)
 
     def process_request(self, request: Request, spider: Spider):
         """
@@ -58,11 +59,15 @@ class ArticleIdFilterDownloadMiddleware:
         :param spider:
         :return:
         """
+        # 如果是在 debug 则跳过
+        if getattr(spider, "debug", False):
+            return None
+
         if request.method == "GET":
             url = request.url
             article_id = _parse_article_id(url)
             if article_id and redis.check_article_id_exist(article_id):
-                self.stats.inc_value("filtered_count")
+                self.stats.inc_value(constant.constants.StatsKey.FILTERED_COUNT)
                 raise IgnoreRequest(
                     f"article_id: `{article_id}` is duplicated, filter it!"
                 )
