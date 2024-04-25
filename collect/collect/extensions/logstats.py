@@ -37,11 +37,14 @@ class LogStats:
     def log(self, spider):
         # 最新时间戳
         latest_timestamp = datetime.datetime.fromtimestamp(
-            (redis_tools.get_latest_announcement_timestamp(parse_to_str=False) or 0.0) / 1000
+            (redis_tools.get_latest_announcement_timestamp(parse_to_str=False) or 0.0)
+            / 1000
         ).strftime("%Y-%m-%d %H:%M:%S:%f")
         # 已经成功处理的公告数量
         process_announcement_count = redis_tools.count_article_ids()
-        process_item_count = self.stats.get_value(constants.StatsKey.REDIS_UPDATE_PROCESS_ITEM_COUNT, 0)
+        process_item_count = self.stats.get_value(
+            constants.StatsKey.REDIS_UPDATE_PROCESS_ITEM_COUNT, 0
+        )
 
         # 异常数量
         parse_error_count = self.stats.get_value(
@@ -82,7 +85,7 @@ class LogStats:
             "parse_error_count": parse_error_count,
             "filtered_count": filtered_count,
             "actual_crawl_count": actual_crawl_count,
-            "residual_crawl_count": residual_crawl_count
+            "residual_crawl_count": residual_crawl_count,
         }
         logger.info(msg, log_args, extra={"spider": spider})
 

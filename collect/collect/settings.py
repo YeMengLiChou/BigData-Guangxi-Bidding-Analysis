@@ -26,7 +26,7 @@ DOWNLOAD_TIMEOUT = 30
 CONCURRENT_ITEMS = 64
 
 # 对同一个域名的最大并发请求数
-CONCURRENT_REQUESTS_PER_DOMAIN = 24
+CONCURRENT_REQUESTS_PER_DOMAIN = 16
 
 # 重试次数
 RETRY_TIMES = 5
@@ -65,7 +65,7 @@ DOWNLOADER_MIDDLEWARES = {
     "collect.middlewares.ArticleIdFilterDownloadMiddleware": 12,
     "collect.middlewares.UserAgentMiddleware": 100,
     "collect.middlewares.ResponseDebugMiddleware": 100,
-    "collect.middlewares.TimeoutProxyDownloadMiddleware": 100,
+    "collect.middlewares.TimeoutProxyDownloadMiddleware": 600,
     "scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware": 500,
 }
 
@@ -108,7 +108,7 @@ REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
-LOG_LEVEL=logging.INFO
+LOG_LEVEL = logging.DEBUG
 # LOG_FILE="logs/out.log"
 
 # 内存调试，显示内存使用情况

@@ -13,5 +13,5 @@ __all__ = [
     "ParseErrorHandlerMiddleware",
     "ParseError",
     "UserAgentMiddleware",
-    "TimeoutProxyDownloadMiddleware"
+    "TimeoutProxyDownloadMiddleware",
 ]

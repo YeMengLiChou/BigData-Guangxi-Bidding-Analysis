@@ -156,9 +156,8 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 # 标项名称
                 bid_item[constants.KEY_BID_ITEM_NAME] = part[idx + 1]
                 # 废标理由
-                bid_item[constants.KEY_BID_ITEM_REASON] = common.parse_bid_item_reason(
-                    part[idx + 2]
-                )
+                bid_item[constants.KEY_BID_ITEM_REASON] = part[idx + 2]
+
                 # 某些情况下:  其他事项这一列为空，导致在预处理的时候就已经被过滤掉，这里需要判断一下
                 if idx + 3 < n:
                     if (

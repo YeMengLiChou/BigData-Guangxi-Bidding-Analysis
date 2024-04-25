@@ -29,9 +29,7 @@ PATTERN_DESC_NUMBER_UNIT_NO_COMMA = re.compile(
 )
 
 # 中文大写金额（小写金额）
-PATTERN_CHINESE_NUMBER = re.compile(
-    r"([^0-9]*)[(（]?[¥￥]?(\d*(\.\d*)?)元?[)）]?"
-)
+PATTERN_CHINESE_NUMBER = re.compile(r"([^0-9]*)[(（]?[¥￥]?(\d*(\.\d*)?)元?[)）]?")
 
 # 同PATTERN_DESC_NUMBER_UNIT， 但是单位为元
 PATTERN_DESC_NUMBER_YUAN_UNIT = re.compile(r"(\S*)[:：](\d*(?:\.\d*)?)[(（](元)[)）]")

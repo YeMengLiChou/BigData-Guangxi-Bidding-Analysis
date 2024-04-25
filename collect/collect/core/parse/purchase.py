@@ -95,9 +95,7 @@ class StandardFormatParser(AbstractFormatParser):
                 item_index += 1
                 total_budget -= float(budget)
         else:
-            raise ParseError(
-                msg="基本情况解析失败：标项信息匹配失败", content=[string]
-            )
+            raise ParseError(msg="基本情况解析失败：标项信息匹配失败", content=[string])
 
         if total_budget is None or total_budget > 1e-5:
             raise ParseError(msg="标项预算合计与总预算不符", content=[string])
@@ -134,10 +132,7 @@ def parse_html(html_content: str):
     # 将 result 划分为 若干个部分
     try:
         parts = common.split_content_by_titles(
-            result=result,
-            is_win_bid=False,
-            check_title=check_useful_part,
-            rfind=True
+            result=result, is_win_bid=False, check_title=check_useful_part, rfind=True
         )
         # print(json.dumps(parts, ensure_ascii=False, indent=4))
     except BaseException as e:

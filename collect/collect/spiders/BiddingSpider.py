@@ -6,7 +6,7 @@ import urllib.parse
 from typing import Any
 
 import scrapy
-from scrapy import signals
+from scrapy import signals, Request
 from scrapy.crawler import Crawler
 from scrapy.http import Response
 from typing_extensions import Self
@@ -183,7 +183,7 @@ class BiddingSpider(scrapy.Spider):
         # )
 
         self.publish_date_begin = datetime.datetime(year=2022, month=1, day=1)
-        self.publish_date_end = datetime.datetime(year=2024, month=4, day=30)
+        self.publish_date_end = datetime.datetime(year=2022, month=1, day=30)
         logging.info(
             f"Ensured span:\n"
             f"redis_latest_timestamp: {redis_timestamp}\n"
@@ -359,16 +359,16 @@ class BiddingSpider(scrapy.Spider):
                     begin = f"{year}-{month:02d}-01"
                     end = f"{year}-{month:02d}-{end_day}"
                     priority_start += 100
-
+                    logger.debug(f"{begin} -> {end}, priority_star: {priority_start}")
                     yield self._make_result_request(
-                            page_no=1,
-                            page_size=1,
-                            publish_date_begin=begin,
-                            publish_date_end=end,
-                            callback=self.parse_result_amount,
-                            dont_filter=True,
-                            priority=get_request_priority(priority_start),
-                        )
+                        page_no=1,
+                        page_size=1,
+                        publish_date_begin=begin,
+                        publish_date_end=end,
+                        callback=self.parse_result_amount,
+                        dont_filter=True,
+                        priority=get_request_priority(priority_start),
+                    )
 
     @stats.function_stats(logger)
     def parse_result_amount(self, response: Response):
@@ -425,20 +425,18 @@ class BiddingSpider(scrapy.Spider):
             # 该数据为一个列表
             data: list = response_data["data"]
 
-            publish_date_begin = response.request.body['publishDateBegin']
-            publish_date_end = response.request.body['publishDateEnd']
-            page_no = response.request.body["pageNo"]
-            logger.info(f"result_list_meta: {publish_date_begin} -> {publish_date_end}: {page_no}")
+            r: Request = response.request
+            body = json.loads(r.body)
+            publish_date_begin = body["publishDateBegin"]
+            publish_date_end = body["publishDateEnd"]
+            page_no = body["pageNo"]
+            logger.info(
+                f"result_list_meta: {publish_date_begin} -> {publish_date_end}: {page_no}"
+            )
 
             if data is None:
                 logger.warning(f"结果列表apip返回结果data为None {response.meta}")
                 return
-
-            # 统计已经爬取到的公告数量
-            self.crawler.stats.inc_value(
-                constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT,
-                len(data),
-            )
 
             # 对于列表中的每个公告数据，都拿到所需要的数据 meta，进而生成对应的请求
             for meta in result.parse_response_data(data):
@@ -469,6 +467,11 @@ class BiddingSpider(scrapy.Spider):
         if response_body.get("success", False):
             meta: dict = response.meta
             data: dict = response_body["result"]["data"]
+
+            # 统计已经爬取到的公告数量
+            self.crawler.stats.inc_value(
+                constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT,
+            )
 
             # 解析 html 结果
             try:

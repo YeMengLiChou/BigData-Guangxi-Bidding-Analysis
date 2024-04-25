@@ -51,7 +51,5 @@ class TimeoutProxyDownloadMiddleware:
                         )
                         return new_request
             else:
-                logger.warning(
-                    f"Gave up retrying {request.url}."
-                )
+                logger.warning(f"Gave up retrying {request.url}.")
         return None

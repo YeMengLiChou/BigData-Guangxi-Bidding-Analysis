@@ -55,7 +55,7 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
 
     # 如果不是结果公告 或者 没有对应的数据，那么赋默认值
     if (not data.get(constants.KEY_PROJECT_IS_TERMINATION, False)) or (
-            not data.get(constants.KEY_PROJECT_TERMINATION_REASON, None)
+        not data.get(constants.KEY_PROJECT_TERMINATION_REASON, None)
     ):
         data[constants.KEY_PROJECT_TERMINATION_REASON] = None
 
@@ -63,10 +63,14 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
 
 
 class NotWinBidStandardFormatParser(AbstractFormatParser):
-    PATTERN_BID_ITEM_CHECK = re.compile(r"((\d+)(?:标项|分标|标段|包))|((?:标项|分标|标段|包)(\d+))")
+    PATTERN_BID_ITEM_CHECK = re.compile(
+        r"((\d+)(?:标项|分标|标段|包))|((?:标项|分标|标段|包)(\d+))"
+    )
 
     # 数字序号(在文字前面）
-    PATTERN_BID_ITEM_NUMBER_INDEX_FRONT = re.compile(r"(\d)+(?:标项|分标|标段|包)[:：]?(.*)")
+    PATTERN_BID_ITEM_NUMBER_INDEX_FRONT = re.compile(
+        r"(\d)+(?:标项|分标|标段|包)[:：]?(.*)"
+    )
 
     # 数字序号(在文字后面）
     PATTERN_BID_ITEM_NUMBER_INDEX_BACK = re.compile(
@@ -134,27 +138,30 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
                 # 每个标项都有单独的理由说明
                 # 拿到关键词
-                if symbol_tools.get_symbol(
+                if (
+                    symbol_tools.get_symbol(
                         p, ("标项", "分标", "包", "标段"), raise_error=False
-                ) is None:
+                    )
+                    is None
+                ):
                     continue
 
                 # 解析出是第几个标项
                 # 数字分标：分标1:xxxx
                 if (
-                        match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_FRONT.match(
-                            p
-                        )
+                    match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_FRONT.match(
+                        p
+                    )
                 ) or (
-                        match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_BACK.match(
-                            p
-                        )
+                    match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_BACK.match(
+                        p
+                    )
                 ):
                     index, reason = match.group(1), match.group(2)
 
                 # 字母分标：A分标:xxxx
                 elif match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_CHARACTER_INDEX.match(
-                        p
+                    p
                 ):
                     index, reason = match.group(1), match.group(2)
                     # 将其转化为 数字
@@ -162,14 +169,14 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
                 # 连续的 标项：本项目1、2分标投标文件提交截止时间后提交投标文件的供应商不足三家，本项目废标"
                 elif match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_COMPACT_INDEX.search(
-                        p
+                    p
                 ):
                     index_sequence, reason = match.groups()
                     index = list(map(int, index_sequence.split("、")))
 
                 # 至投标文件递交截止时间，1分标、2分标、5分标提交投标文件的供应商均不足3家，本项目采购失败
                 elif match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_COMPACT_INDEX_WITH_UNIT.search(
-                        p
+                    p
                 ):
                     index_sequence, reason = match.groups()
                     split_sym = symbol_tools.get_symbol(
@@ -187,9 +194,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                     bid_item = common.get_template_bid_item(
                         index=int(index), is_win=False
                     )
-                    bid_item[constants.KEY_BID_ITEM_REASON] = (
-                        common.parse_bid_item_reason(reason)
-                    )
+                    bid_item[constants.KEY_BID_ITEM_REASON] = reason
                     bid_items.append(bid_item)
                 # 第三种情况，出现多个标项
                 elif isinstance(index, list):
@@ -201,9 +206,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                             idx = pre + 1
                         pre = idx
                         bid_item = common.get_template_bid_item(index=idx, is_win=False)
-                        bid_item[constants.KEY_BID_ITEM_REASON] = (
-                            common.parse_bid_item_reason(reason)
-                        )
+                        bid_item[constants.KEY_BID_ITEM_REASON] = reason
                         bid_items.append(bid_item)
 
         # 共用一个标项
@@ -211,7 +214,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
             logger.debug(f"废标理由共用：`{string}`")
             data[constants.KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE] = True
             item = common.get_template_bid_item(index=1, is_win=False)
-            item[constants.KEY_BID_ITEM_REASON] = common.parse_bid_item_reason(string)
+            item[constants.KEY_BID_ITEM_REASON] = string
             bid_items.append(item)
 
         if len(bid_items) == 0:
