@@ -34,4 +34,4 @@ class CollectKafkaPipeline:
             self.stats.inc_value(
                 constant.constants.StatsKey.COLLECT_KAFKA_SEND_FAILED_COUNT
             )
-        return {"status": "Success"}
+        return "Success"

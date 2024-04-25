@@ -10,6 +10,7 @@ from typing import Union, Any
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
+
 from constant import constants
 from utils import time
 
@@ -136,6 +137,9 @@ def complete_error(error: ParseError, response: Response):
                 constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None
             )
         else:
+            if isinstance(error.article_ids, str):
+                error.article_ids = [error.article_ids]
+
             error.article_ids.append("|")
             error.article_ids.extend(
                 response.meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None)
@@ -288,6 +292,11 @@ class ParseErrorHandlerMiddleware:
             url = response.url
             # 总数+1
             spider.crawler.stats.inc_value(constants.StatsKey.PARSE_ERROR_TOTAL)
+
+            # 如果包含了候选人公示，则选择不处理
+            if response.meta.get(constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE, False):
+                return []
+
             article_id = self._check_url_duplicated(url)
             if not article_id:
                 logger.warning(
@@ -306,9 +315,12 @@ class ParseErrorHandlerMiddleware:
                     f"msg: {exception.message}"
                 )
                 # 非重复+1
-                spider.crawler.stats.inc_value(constants.StatsKey.PARSE_ERROR_NON_DUPLICATED)
+                spider.crawler.stats.inc_value(
+                    constants.StatsKey.PARSE_ERROR_NON_DUPLICATED
+                )
                 self.exceptions["error"].append(exception)
                 self.articleIds.add(article_id)
+
             logger.exception(exception)
             return []
 

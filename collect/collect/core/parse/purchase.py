@@ -68,9 +68,9 @@ class StandardFormatParser(AbstractFormatParser):
         if match := StandardFormatParser.PATTERN_BIDDING.findall(suffix):
             if len(match) == 0:
                 raise ParseError(msg="基本情况解析失败：无标项信息", content=[string])
+            # 标项编号
+            item_index = 1
             for m in match:
-                # 标项编号
-                item_index = 1
                 index, name, budget = m
 
                 if index is None or name is None or budget is None:
@@ -86,7 +86,6 @@ class StandardFormatParser(AbstractFormatParser):
                     else:
                         # 中文数字
                         index = common.translate_zh_to_number(index)
-
                 item = common.get_template_bid_item(
                     is_win=False, index=index, name=name
                 )
@@ -138,6 +137,7 @@ def parse_html(html_content: str):
             result=result,
             is_win_bid=False,
             check_title=check_useful_part,
+            rfind=True
         )
         # print(json.dumps(parts, ensure_ascii=False, indent=4))
     except BaseException as e:

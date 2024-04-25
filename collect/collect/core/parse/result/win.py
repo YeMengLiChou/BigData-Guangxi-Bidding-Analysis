@@ -1,4 +1,5 @@
 import logging
+import re
 
 from collect.collect.core.parse import (
     AbstractFormatParser,
@@ -52,17 +53,40 @@ class WinBidStandardFormatParser(AbstractFormatParser):
     解析中标结果
     """
 
+    PATTERN_BID_ITEM_INDEX_NUMBER = re.compile(r"(\d{1,2})")
+
+    PATTERN_BID_ITEM_INDEX_ALPHA_AND_TEXT = re.compile(
+        r"(?:标项|)([A-Z]+)(?:分标|标段)"
+    )
+
+    PATTERN_BID_ITEM_INDEX_ALPHA_AND_NUMBER = re.compile(r"([A-Z]+)(\d*)")
+
     @staticmethod
-    def __is_bid_item_index(s: str) -> bool:
+    def __is_bid_item_index(s: str, def_index: int) -> int:
         """
         判断是否为标项的序号
         :param s:
         :return:
         """
-        # 存在部分情况的需要
-        return s.isdigit() or (  # 纯数字： 1、2、3...
-                s[0].isalpha() and s[1:].isdigit()
-        )  # 第一个是字母，后面是数字： A060205
+        for p in [
+            WinBidStandardFormatParser.PATTERN_BID_ITEM_INDEX_NUMBER,
+            WinBidStandardFormatParser.PATTERN_BID_ITEM_INDEX_ALPHA_AND_TEXT,
+            WinBidStandardFormatParser.PATTERN_BID_ITEM_INDEX_ALPHA_AND_NUMBER,
+        ]:
+            if match := p.fullmatch(s):
+                # 后面带有数字的使用默认序号
+                if len(match.groups()) == 2:
+                    if len(match.groups(2)) == 0:
+                        return ord(match.group(1)) - ord("A") + 1
+                    else:
+                        return def_index
+                # 数字和字母
+                index = match.group(1)
+                if index.isdigit():
+                    return int(index)
+                else:
+                    return ord(index) - ord("A") + 1
+        return -1
 
     @staticmethod
     @stats.function_stats(logger)
@@ -73,11 +97,14 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         :return:
         """
         idx, n, data = 0, len(part), []
-        print(part)
         while idx < n:
             text = part[idx]
             # 当前是序号
-            if WinBidStandardFormatParser.__is_bid_item_index(text):
+            if (
+                index := WinBidStandardFormatParser.__is_bid_item_index(
+                    text, def_index=len(data) + 1
+                )
+            ) != -1:
                 # 中标金额
                 price_text = part[idx + 1]
                 # 中标供应商
@@ -85,23 +112,18 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 # 中标供应商地址
                 pre = idx + 3
                 idx += 3
-                while idx < n and not WinBidStandardFormatParser.__is_bid_item_index(
-                        part[idx]
+                while (
+                    idx < n
+                    and WinBidStandardFormatParser.__is_bid_item_index(
+                        part[idx], def_index=len(data) + 1
+                    )
+                    == -1
                 ):
                     idx += 1
                 address_text = "".join(part[pre:idx])
 
-                # 标项信息
-                if text.isdigit():
-                    bid_item = common.get_template_bid_item(
-                        is_win=True, index=int(text)
-                    )
-                else:
-                    bid_item = common.get_template_bid_item(
-                        is_win=True, index=len(data) + 1
-                    )
-
-                amount, is_percent = AbstractFormatParser.parse_win_bid_item_amount(
+                bid_item = common.get_template_bid_item(is_win=True, index=index)
+                amount, is_percent = AbstractFormatParser.parse_amount(
                     amount_str=price_text
                 )
                 bid_item[constants.KEY_BID_ITEM_AMOUNT] = amount
@@ -124,11 +146,13 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         """
         idx, n, data = 0, len(part), []
         while idx < n:
-            if WinBidStandardFormatParser.__is_bid_item_index(part[idx]):
-                # 当前 idx 为序号
-                bid_item = common.get_template_bid_item(
-                    index=int(part[idx]), is_win=False
+            if (
+                index := WinBidStandardFormatParser.__is_bid_item_index(
+                    part[idx], def_index=len(data) + 1
                 )
+            ) > -1:
+                # 当前 idx 为序号
+                bid_item = common.get_template_bid_item(index=index, is_win=False)
                 # 标项名称
                 bid_item[constants.KEY_BID_ITEM_NAME] = part[idx + 1]
                 # 废标理由
@@ -137,7 +161,12 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 )
                 # 某些情况下:  其他事项这一列为空，导致在预处理的时候就已经被过滤掉，这里需要判断一下
                 if idx + 3 < n:
-                    if WinBidStandardFormatParser.__is_bid_item_index(part[idx + 3]):
+                    if (
+                        WinBidStandardFormatParser.__is_bid_item_index(
+                            part[idx + 3], def_index=len(data) + 1
+                        )
+                        > -1
+                    ):
                         idx += 3
                     else:
                         idx += 4
@@ -176,7 +205,11 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 return True
             if "供应商地址" in part[idx]:
                 return True
-            if "中标（成交）金额" in part[idx] or "中标金额" in part[idx] or "成交金额" in part[idx]:
+            if (
+                "中标（成交）金额" in part[idx]
+                or "中标金额" in part[idx]
+                or "成交金额" in part[idx]
+            ):
                 return True
             return False
 
@@ -189,7 +222,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 colon_idx = part[idx].find("：")
                 if colon_idx == -1:
                     colon_idx = part[idx].find(":")
-                part.insert(idx + 1, part[idx][colon_idx + 1:])
+                part.insert(idx + 1, part[idx][colon_idx + 1 :])
                 nonlocal n
                 n += 1
 
@@ -204,9 +237,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             idx += 1
             t_idx = idx
             while (
-                    idx < n
-                    and common.startswith_number_index(part[idx]) == -1
-                    and not check_title()
+                idx < n
+                and common.startswith_number_index(part[idx]) == -1
+                and not check_title()
             ):
                 idx += 1
             item[item_key] = "".join(part[t_idx:idx])
@@ -217,26 +250,30 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 get_content(constants.KEY_BID_ITEM_SUPPLIER)
             elif "供应商地址" in part[idx]:
                 get_content(constants.KEY_BID_ITEM_SUPPLIER_ADDRESS)
-            elif "中标（成交）金额" in part[idx] or "中标金额" in part[idx] or "成交金额" in part[idx]:
+            elif (
+                "中标（成交）金额" in part[idx]
+                or "中标金额" in part[idx]
+                or "成交金额" in part[idx]
+            ):
                 split_title()
                 idx += 1
                 tmp_idx = idx
                 # 某些情况下存在金额 “xxxx.xxx” 会被解析，显示解析后的数目少于 5
 
                 while idx < n and (
-                        common.startswith_number_index(part[idx]) == -1  # 不以 '数字.' 开头
-                        or (
-                                (index := part[idx].find("."))
-                                != -1  # 某些情况存在为小数开头，先找到小数点位置 index
-                                and index < len(part[idx]) - 1  # 确保小数点后面有字符
-                                and part[idx][index + 1].isdigit()  # 小数点后面是数字
-                        )
-                        and not check_title()
+                    common.startswith_number_index(part[idx]) == -1  # 不以 '数字.' 开头
+                    or (
+                        (index := part[idx].find("."))
+                        != -1  # 某些情况存在为小数开头，先找到小数点位置 index
+                        and index < len(part[idx]) - 1  # 确保小数点后面有字符
+                        and part[idx][index + 1].isdigit()  # 小数点后面是数字
+                    )
+                    and not check_title()
                 ):
                     idx += 1
 
                 amount_text = "".join(part[tmp_idx:idx])
-                amount, is_percent = AbstractFormatParser.parse_win_bid_item_amount(
+                amount, is_percent = AbstractFormatParser.parse_amount(
                     amount_str=amount_text
                 )
                 item[constants.KEY_BID_ITEM_AMOUNT] = amount
@@ -283,9 +320,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             :return:
             """
             return (
-                    common.startswith_number_index(s) == 1
-                    and "中标结果" in s
-                    and (s.endswith("：") or s.endswith(":"))
+                common.startswith_number_index(s) == 1
+                and "中标结果" in s
+                and (s.endswith("：") or s.endswith(":"))
             )
 
         def is_not_win_bid_result(s: str) -> bool:
@@ -295,9 +332,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             :return:
             """
             return (
-                    common.startswith_number_index(s) == 2
-                    and "废标结果" in s
-                    and (s.endswith("：") or s.endswith(":"))
+                common.startswith_number_index(s) == 2
+                and "废标结果" in s
+                and (s.endswith("：") or s.endswith(":"))
             )
 
         data, idx, n = [], 0, len(part)
@@ -319,7 +356,7 @@ class WinBidStandardFormatParser(AbstractFormatParser):
             elif is_not_win_bid_result(text):
                 part_cnt += 1
                 data.extend(
-                    WinBidStandardFormatParser._parse_not_win_bids(part=part[idx + 1:])
+                    WinBidStandardFormatParser._parse_not_win_bids(part=part[idx + 1 :])
                 )
                 idx += 1
             else:
@@ -345,7 +382,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
 
             # 如果还是没办法解析，就直接抛出异常
             if not success:
-                raise ParseError(msg="win.py解析中标标项信息出现新格式", content=part + errors)
+                raise ParseError(
+                    msg="win.py解析中标标项信息出现新格式", content=part + errors
+                )
 
         elif part_cnt == 1:
             raise ParseError(msg="win.py解析中标标项信息出现新格式", content=part)

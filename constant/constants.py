@@ -50,6 +50,8 @@ class BidItemReason:
     NOT_ENOUGH_SUPPLIERS = 1
     """
     标项-废标理由：供应商不足
+    ex:\n
+    
     """
 
     BIDDING_DOCUMENTS_AMBIGUITY = 2

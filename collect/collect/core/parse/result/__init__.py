@@ -139,6 +139,7 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
         if (
             (("废标" in title or "流标") and ("原因" in title or "理由" in title))
             or ("采购结果信息" in title)
+            or ("采购结果" in title)
             or ("结果信息" in title)
         ):
             return constants.PartKey.NOT_WIN_BID

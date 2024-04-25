@@ -40,15 +40,22 @@ def get_symbol(
 
 def get_parentheses_position(s: str) -> tuple[int, int]:
     """
-    获取中文/英文的括号位置
+    获取 ``s`` 中 中文/英文括号的位置
     :return:
     """
     if "(" in s:
-        return s.find("("), s.find(")")
-    elif "（" in s:
-        return s.find("（"), s.find("）")
+        left_idx = s.find("(")
+    elif '（' in s:
+        left_idx = s.find('（')
     else:
-        return -1, -1
+        left_idx = -1
+    if ")" in s:
+        right_idx = s.find(")")
+    elif "）" in s:
+        right_idx = s.find("）")
+    else:
+        right_idx = -1
+    return left_idx, right_idx
 
 
 def endswith_colon_symbol(s: str) -> bool:

@@ -1,3 +1,5 @@
+import logging
+
 BOT_NAME = "collect"
 
 SPIDER_MODULES = ["collect.spiders"]
@@ -10,16 +12,29 @@ NEWSPIDER_MODULE = "collect.spiders"
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 48
+CONCURRENT_REQUESTS = 16
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 2
+DOWNLOAD_DELAY = 0.5
 
-DOWNLOAD_TIMEOUT = 30
+# 下载超时30
+DOWNLOAD_TIMEOUT = 15
 
-CONCURRENT_ITEMS = 100
+# 对用一个响应的最大处理item数
+CONCURRENT_ITEMS = 64
+
+# 对同一个域名的最大并发请求数
+CONCURRENT_REQUESTS_PER_DOMAIN = 16
+
+
+# 最大线程池大小
+REACTOR_THREADPOOL_MAXSIZE = 16
+
+# url长度限制
+URLLENGTH_LIMIT = 3000
+
 # The download delay setting will honor only one of:
 # CONCURRENT_REQUESTS_PER_DOMAIN = 16
 # CONCURRENT_REQUESTS_PER_IP = 16
@@ -60,7 +75,7 @@ EXTENSIONS = {"collect.extensions.LogStats": 300}
 ITEM_PIPELINES = {
     "collect.pipelines.CollectKafkaPipeline": 300,
     "collect.pipelines.UpdateRedisInfoPipeline": 200,
-    # "collect.pipelines.DebugPipeline": 200,
+    "collect.pipelines.DebugPipeline": 200,
     # "collect.pipelines.DebugWritePipeline": 100,
 }
 
@@ -90,6 +105,8 @@ REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
+LOG_LEVEL=logging.DEBUG
+# LOG_FILE="logs/out.log"
 
 # 内存调试，显示内存使用情况
 MEMDEBUG_ENABLED = True

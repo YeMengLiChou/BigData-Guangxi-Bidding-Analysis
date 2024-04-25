@@ -8,7 +8,6 @@ import scrapy
 from scrapy import signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
-from twisted.python.failure import Failure
 from typing_extensions import Self
 
 from collect.collect.core.api.category import CategoryApi
@@ -244,13 +243,15 @@ class BiddingSpider(scrapy.Spider):
         # ("MN3ZxA9/8/g4pl7kKjrhAQ==", False),
         # ("yVQkBa/S5gjCS+Wo5a/uHQ==", True),
         # ("TMJIaEmoGeGNw+SiFMYq3Q==", True),
+        # ("Y3a99JCbCI70/y45/e8Arg==", True),   # 候选人
+        # ("6k0ZVDekEtfmODN7QqWIcA==", True),   # 候选人
         # ("qc5WYAYyrg4+SgqQkq7X+Q==", False),  # 评审专家信息出现不符合所需的格式（未解决）
         # ("cxTkJqERmdb2qXt13qSDWQ==", True),  # 评审专家出现问题（未解决）
         # ("T4VzPFZB/HmUD9iDXSoi7Q==", True),  # 评审专家出现问题（未解决）
         # ("Oq2TLfohRLSDv5NXT/Va5g==", True),  # 评审专家出现问题（未解决）
         # ("IH8Vnux6cJnOWI/RJ7vAIw==", True),  # 评审专家出现问题（未解决）
         # ("hIJqsMp244oLSghWB+DKnQ==", True),  # 评审专家出现问题（未解决）
-        # ("TDbW1N2IglUbO8Y2B1n5KQ==", True),  # 评审专家出现问题（未解决）
+        # ("TDbW1N2IglUbO8Y2B1n5KQ==", False),  # 评审专家出现问题（未解决）
         # ("hJXPPS4FgL+RplTxqA0nEA==", True),  # 评审专家出现问题（未解决）
         # ("vbysZXBiFUf1Zaq7ZJkSvQ==", True),  # 评审专家出现问题（未解决）
         # ("bDiMVrCgJDoJlCN1ksVgow==", True),  # 评审专家出现问题（未解决）
@@ -259,17 +260,17 @@ class BiddingSpider(scrapy.Spider):
         # ("93/GxfWwx4ZCQdLDPP08NQ==", True),  # 评审专家出现问题（未解决）
         # ("JoZPYxylSynsFRsRGvlP3Q==", True),  # 评审专家出现问题（未解决）
         # ("MPnTH8Rh8cNkG9DuPBMwRQ==", True),  # 评审专家出现问题（未解决）
-        # ("mD0f42nXtRm/dIFqnwqq1Q==", True),  # 评审专家出现问题（未解决）
+        # ("1fMdlN7w0cOS2pd5a0937g==", True),  # 评审专家出现问题（未解决）
         # ("Fq+aDxeiir5UmcV28j3C3g==", True),  # 评审专家出现问题（未解决）
         # ("Msg4SEqlEcUOgyvNfKavHA==", True),  # 评审专家出现问题（未解决）
         # ("VAEDQU7LPHxmGmFiGBj2pA==", True),  # 标项预算合计与总预算不符
         # ("I3xK1ZPz0Teg0AL6qTN42g==", False),  # 标项预算合计与总预算不符
         # ("QPMTDHc/WAtP8JMV0/LTlg==", False),  # 废标结果出现新格式
-
-
-
-
-
+        # ("6vBfDD3qToPf6bRRyYwONw==", False),  # 废标结果出现新格式
+        # ("BcUV8tw1XIKQsZDuHFzH6Q==", False),  # 废标结果出现新格式
+        # ("Hnzom+iTx/ReBTd+RMlGRg==", True),  # 中标结果出现字母序号
+        # ("sHNFU3W8TCIz/psbFcDP/g==", True),  # 评审专家出现组长
+        # ("hTaHgGCkJ258wWpAZBtT6A==", True),  # announcementType为空的结果公告
     ]
 
     #  =========================================
@@ -305,7 +306,6 @@ class BiddingSpider(scrapy.Spider):
             headers={"Content-Type": "application/json;charset=UTF-8"},
             dont_filter=dont_filter,
             priority=priority,
-            errback=self.handle_result_request_error
         )
 
     def start_requests(self):
@@ -447,7 +447,7 @@ class BiddingSpider(scrapy.Spider):
                     )
 
                     # 判断是否为所需要的结果公告
-                    if common.check_unuseful_announcement(data["announcementType"]):
+                    if data["announcementType"] and common.check_unuseful_announcement(data["announcementType"]):
                         raise SwitchError("该结果公告并非所需要的")
 
                     meta.update(

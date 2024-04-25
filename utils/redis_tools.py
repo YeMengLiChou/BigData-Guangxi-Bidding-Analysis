@@ -34,6 +34,12 @@ KEY_ANNOUNCEMENT_ARTICLE_IDS = "bidding:announcement:article_ids"
 已经爬取过的所有公告结果
 """
 
+KEY_PARSE_ERROR_AMOUNT = "bidding:error:amount"
+"""
+金额解析错误
+"""
+
+# KEY_PARSE_ERROR_
 
 # ======================== TOOLS FUNCTIONS ========================= #
 

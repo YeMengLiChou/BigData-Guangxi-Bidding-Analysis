@@ -252,6 +252,12 @@ def check_unuseful_announcement(announcement_type: int) -> bool:
     ]
 
 
+PATTERN_COMPACT_NUMBER = re.compile(r"(\d{1,2}、)+\d{1,2}分标")
+"""
+用于匹配评审专家字符串中的  “第1、2、3、4分标采购人代表”
+"""
+
+
 @stats.function_stats(logger)
 def parse_review_experts(part: list[str]) -> dict:
     """
@@ -261,27 +267,25 @@ def parse_review_experts(part: list[str]) -> dict:
                 和 ``constants.KEY_PROJECT_REVIEW_EXPERT`` 的dict（不为空）
     """
     data = dict()
-
     counter = {}
+    # 统计可能分割符的频率
+    sym_candidates = ("、", "，", ",", " ", "\u3000")
     for i in range(len(part)):
-        split_symbol = sym.get_symbol(
-            part[i], ("、", "，", ",", " ", "\u3000"), raise_error=False
-        )
-        if split_symbol is not None:
-            # 存在分隔符
-            counter[split_symbol] = counter.get(split_symbol, 0) + 1
+        part[i] = PATTERN_COMPACT_NUMBER.sub("", part[i])
+        for _sym in sym_candidates:
+            counter[_sym] = counter.get(_sym, 0) + part[i].count(_sym)
 
     # 评审小组
     review_experts = []
     data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
     # 采购代表人
-    representors = []
-    data[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = representors
+    representatives = []
+    data[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = representatives
 
     # 存在分隔符
     if len(counter) != 0:
         # 拿出现次数的分隔符
-        max_symbol = max(counter, key=lambda x: counter[x])
+        max_symbol = max(counter.keys(), key=lambda x: counter[x])
         # 拿到后面部分的内容
         dist = "".join(part).replace("评审专家名单：", "")  # 部分带有该前缀
         if dist == "/":
@@ -297,6 +301,12 @@ def parse_review_experts(part: list[str]) -> dict:
         p = p.replace("。", "").replace("：", "").replace(":", "")
         # 判断是否有括号
         l, r = sym.get_parentheses_position(p)
+
+        if r < l:
+            raise ParseError(
+                msg="评审专家解析部分出现特殊情况: l > r", content=part + [p]
+            )
+
         # 存在括号
         if l != -1 and r != -1:
             # 名字在括号的右边：（xxx）名字
@@ -314,8 +324,8 @@ def parse_review_experts(part: list[str]) -> dict:
             # 去掉括号加入到评审小组
             review_experts.append(result)
             # 加入到采购代表人
-            if "采购" in p[l + 1 : r]:
-                representors.append(result)
+            if "采购" in p[l:r]:
+                representatives.append(result)
         elif l == -1 and r == -1:
             if p == "/":
                 continue
@@ -449,11 +459,11 @@ def parse_bid_item_reason(reason: str) -> int:
 
 
 PATTERN_PURCHASER = re.compile(
-    r"采购人(?:信息|)(?:\S*?名称)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
+    r"(?:采购|征集|招标)人(?:信息|)(?:\S*?名称\S*?)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
 )
 
 PATTERN_PURCHASER_AGENCY = re.compile(
-    r"采购代理机构(?:信息|)(?:\S*?名称)?[：:](\S+?)(?:地址|联系人|联系方式)[:：]"
+    r"(?:采购|招标)代理机构(?:信息|)(?:\S*?名称)?[：:](\S+?)(?:地址|联系人|联系方式|\d)[:：]?"
 )
 
 
@@ -482,7 +492,18 @@ def parse_contact_info(part: str) -> dict:
         data[constants.KEY_PURCHASER] is None
         or data[constants.KEY_PURCHASER_AGENCY] is None
     ):
-        raise ParseError(msg="出现新的联系方式内容", content=[part])
+        # 某些只有一个名称
+        if part.count("名称") == 1:
+            return data
+        raise ParseError(
+            msg="出现新的联系方式内容",
+            content=[
+                f"purchaser 解析结果:{data[constants.KEY_PURCHASER]}",
+                f"agency 解析结果:{data[constants.KEY_PURCHASER_AGENCY]}",
+                part,
+            ],
+        )
+
     return data
 
 
@@ -499,7 +520,6 @@ def _merge_bid_items(
     # TODO: 可能部分标项信息的index不一致，需要其他方法来进行实现
     _purchase.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
     _result.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
-
     # 仅有一个废标理由，所有标项共用
     if cancel_reason_only_one:
         for i in range(len(_purchase)):
@@ -741,9 +761,11 @@ def split_content_by_titles(
     result: list[str],
     is_win_bid: bool,
     check_title: Callable[[bool, str], int],
+    rfind: bool = False,
 ) -> dict[int, list[str]]:
     """
     根据标题来分片段
+    :param rfind:  是否反向定位查找
     :param result:
     :param is_win_bid:
     :param check_title:
@@ -805,6 +827,10 @@ def split_content_by_titles(
             if key_part:
                 chinese_number_index = index
 
+                # 某些部分已经解析过，然后可能存在重复的部分，判断
+                if key_part in parts:
+                    idx += 1
+                    continue
                 # 某些标题可能和后面的内容连成一块，需要分开
                 if symbol := sym.get_symbol(
                     result[idx], (":", "："), raise_error=False
@@ -812,24 +838,39 @@ def split_content_by_titles(
                     sym_idx = result[idx].index(symbol)
                     # 如果冒号不是最后一个字符
                     if sym_idx < len(result[idx]) - 1:
-                        result.insert(idx + 1, result[idx][sym_idx + 1:])
+                        result.insert(idx + 1, result[idx][sym_idx + 1 :])
                         n += 1
 
                 # 开始部分(不记入标题）
                 idx += 1
                 pre = idx
-                while idx < n and (
-                    # 单个中文
-                    translate_zh_to_number(result[idx]) < chinese_number_index + 1
-                    and
-                    (   # 不以 ‘中文数字、’ 开头
-                        (zh_idx := startswith_chinese_number(result[idx])) == -1
-                        or
-                        # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
-                        zh_idx < chinese_number_index + 1
-                    )
-                ):
-                    idx += 1
+                # 正向查找
+                if not rfind:
+                    while idx < n and (
+                        # 单个中文
+                        translate_zh_to_number(result[idx]) < chinese_number_index + 1
+                        and (  # 不以 ‘中文数字、’ 开头
+                            (zh_idx := startswith_chinese_number(result[idx])) == -1
+                            or
+                            # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                            zh_idx < chinese_number_index + 1
+                        )
+                    ):
+                        idx += 1
+                else:
+                    r_idx = n - 1
+                    while r_idx > idx and (
+                        # 单个中文
+                        translate_zh_to_number(result[r_idx]) > chinese_number_index + 1
+                        and (  # 不以 ‘中文数字、’ 开头
+                            (zh_idx := startswith_chinese_number(result[r_idx])) == -1
+                            or
+                            # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                            zh_idx > chinese_number_index + 1
+                        )
+                    ):
+                        r_idx -= 1
+                    idx = r_idx + 1
                 # 加入片段
                 parts[key_part] = result[pre:idx]
             else:
