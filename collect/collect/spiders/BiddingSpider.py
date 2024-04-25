@@ -1,3 +1,4 @@
+import datetime
 import importlib
 import json
 import logging
@@ -125,7 +126,7 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
             purchase_publish_dates.extend(other_publish_dates)
         else:
             # 存在没有 “采购公告” 的情况
-            logger.warning(
+            logger.debug(
                 f"解析其他公告时未发现采购公告相关信息: other_announcements: {other_announcements}"
             )
 
@@ -145,8 +146,8 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
     meta[constants.KEY_DEV_START_RESULT_ARTICLE_ID] = current_result_id
 
     # 计算招标持续时间
-    tender_duration = time_tools.now_timestamp() - min_publish_date
-    if tender_duration <= 0:
+    tender_duration = max_publish_date - min_publish_date
+    if tender_duration < 0:
         raise ParseError(
             msg=f"解析 other_announcement 时出现异常, duration计算为 {tender_duration}",
             content=[
@@ -180,8 +181,9 @@ class BiddingSpider(scrapy.Spider):
         # self.publish_date_end = redis.parse_timestamp(
         #     timestamp=time_tools.now_timestamp()
         # )
-        self.publish_date_begin = "2022-01-01"
-        self.publish_date_end = "2022-01-01"
+
+        self.publish_date_begin = datetime.datetime(year=2022, month=1, day=1)
+        self.publish_date_end = datetime.datetime(year=2024, month=4, day=30)
         logging.info(
             f"Ensured span:\n"
             f"redis_latest_timestamp: {redis_timestamp}\n"
@@ -280,6 +282,8 @@ class BiddingSpider(scrapy.Spider):
         self,
         page_no: int,
         page_size: int,
+        publish_date_begin: str,
+        publish_date_end: str,
         callback: callable,
         dont_filter: bool = False,
         priority: int = 0,
@@ -297,12 +301,16 @@ class BiddingSpider(scrapy.Spider):
             callback=callback,
             method=CategoryApi.method,
             body=CategoryApi.generate_body(
-                pageNo=page_no,
-                pageSize=page_size,
-                categoryCode="ZcyAnnouncement2",
-                publishDateBegin=self.publish_date_begin,
-                publishDateEnd=self.publish_date_end,
+                page_no=page_no,
+                page_size=page_size,
+                category_code="ZcyAnnouncement2",
+                publish_date_begin=publish_date_begin,
+                publish_date_end=publish_date_end,
             ),
+            meta={
+                "begin": publish_date_begin,
+                "end": publish_date_end,
+            },
             headers={"Content-Type": "application/json;charset=UTF-8"},
             dont_filter=dont_filter,
             priority=priority,
@@ -333,13 +341,34 @@ class BiddingSpider(scrapy.Spider):
                 )
         else:
             # 正常爬取
-            yield self._make_result_request(
-                page_no=1,
-                page_size=1,
-                callback=self.parse_result_amount,
-                dont_filter=True,
-                priority=get_request_priority(0),
-            )
+            # 计算优先级，保证时间越早的在前面，priority = MAX_TIMESTAMP - priority_start
+            priority_start = -10000
+            # 因为api最多只能检索到1w条数据，因此不能一次性选择很大的时间范围，这里选择拆分为一个月的时间跨度
+            for year in range(
+                self.publish_date_begin.year, self.publish_date_end.year + 1
+            ):
+                for month in range(1, 13):
+                    # 跳过超出时间范围的
+                    if (
+                        year == self.publish_date_end.year
+                        and month > self.publish_date_end.month
+                    ):
+                        continue
+
+                    end_day = time_tools.get_days_by_year_and_month(year, month)
+                    begin = f"{year}-{month:02d}-01"
+                    end = f"{year}-{month:02d}-{end_day}"
+                    priority_start += 100
+
+                    yield self._make_result_request(
+                            page_no=1,
+                            page_size=1,
+                            publish_date_begin=begin,
+                            publish_date_end=end,
+                            callback=self.parse_result_amount,
+                            dont_filter=True,
+                            priority=get_request_priority(priority_start),
+                        )
 
     @stats.function_stats(logger)
     def parse_result_amount(self, response: Response):
@@ -352,22 +381,36 @@ class BiddingSpider(scrapy.Spider):
         success = data["success"]
         if success:
             total = int(data["result"]["data"]["total"])
-            self.logger.debug(f"initial fetch amount: {total}")
-            self.crawler.stats.set_value(
+            self.crawler.stats.inc_value(
                 constants.StatsKey.SPIDER_PLANNED_CRAWL_COUNT, total
             )
+            # 当前的总数
+            total_count = self.crawler.stats.get_value(
+                constants.StatsKey.SPIDER_PLANNED_CRAWL_COUNT
+            )
+            self.logger.info(f"total fetch count: {total_count}")
+
+            publish_date_begin = response.meta["begin"]
+            publish_date_end = response.meta["end"]
+
+            # 优先级，注意：现在已经是负数
+            priority_start = response.request.priority
             # 从后面开始爬取
-            end = total // 100 + (0 if total % 100 == 0 else 1)
+            end = total // 100 + (1 if total % 100 == 0 else 2)
+            # end -> 1
+            # priority_start 应该越来越小，来保证最终的priority越来越大
             for i in range(end, 0, -1):
                 yield self._make_result_request(
                     page_no=i,
                     page_size=100,
+                    publish_date_begin=publish_date_begin,
+                    publish_date_end=publish_date_end,
                     callback=self.parse_result_data,
                     dont_filter=True,
-                    priority=get_request_priority(-i),  # 优先级最高，i越大应该越先爬取
+                    priority=get_request_priority(priority_start - i),
                 )
         else:
-            self.logger.error(f"response not success: {response.text}")
+            self.logger.error(f"response not success: {response.url}")
 
     @stats.function_stats(logger)
     def parse_result_data(self, response: Response):
@@ -381,6 +424,11 @@ class BiddingSpider(scrapy.Spider):
             response_data = response_body["result"]["data"]
             # 该数据为一个列表
             data: list = response_data["data"]
+
+            publish_date_begin = response.request.body['publishDateBegin']
+            publish_date_end = response.request.body['publishDateEnd']
+            page_no = response.request.body["pageNo"]
+            logger.info(f"result_list_meta: {publish_date_begin} -> {publish_date_end}: {page_no}")
 
             if data is None:
                 logger.warning(f"结果列表apip返回结果data为None {response.meta}")
@@ -408,7 +456,7 @@ class BiddingSpider(scrapy.Spider):
                     meta=meta,
                 )
         else:
-            self.logger.error(f"result response not success: {response.text}")
+            self.logger.error(f"result response not success: {response.url}")
 
     @stats.function_stats(logger)
     def parse_result_detail_content(self, response: Response):
@@ -447,7 +495,9 @@ class BiddingSpider(scrapy.Spider):
                     )
 
                     # 判断是否为所需要的结果公告
-                    if data["announcementType"] and common.check_unuseful_announcement(data["announcementType"]):
+                    if data["announcementType"] and common.check_unuseful_announcement(
+                        data["announcementType"]
+                    ):
                         raise SwitchError("该结果公告并非所需要的")
 
                     meta.update(
@@ -464,7 +514,9 @@ class BiddingSpider(scrapy.Spider):
                 return
             else:
                 # 没有出现 SwitchError 则解析采购公告
-                purchase_article_ids = meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, [])
+                purchase_article_ids = meta.get(
+                    constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, []
+                )
 
                 if len(purchase_article_ids) == 0:
                     # 没有 “采购公告”，直接进入 make_item 生成 item
@@ -484,7 +536,7 @@ class BiddingSpider(scrapy.Spider):
                         meta=meta,
                     )
         else:
-            self.logger.error(f"result response not success: {response.text}")
+            self.logger.error(f"result response not success: {response.url}")
 
     @stats.function_stats(logger, log_params=True)
     def switch_other_result_announcement(self, meta: dict):
@@ -565,7 +617,7 @@ class BiddingSpider(scrapy.Spider):
                 raise ParseError(
                     msg="采购公告存在逻辑问题", content=[bin(parsed)[2:]] + purchase_ids
                 )
-            logger.warning(
+            logger.debug(
                 f"采购公告 {purchase_ids} 没有解析到任何标项信息， 直接生成 item"
             )
             return common.make_item(data=meta, purchase_data=None)
@@ -617,7 +669,7 @@ class BiddingSpider(scrapy.Spider):
                 else:
                     # 在 2022 前的发布的公告大多格式不统一，直接切换
                     if data["publishDate"] < 1640966400000:
-                        logger.warning(
+                        logger.debug(
                             f"该公告 {get_article_id_from_url(response.url)} 在2022年前发布"
                         )
                         yield self.switch_other_purchase_announcement(meta)
@@ -645,7 +697,7 @@ class BiddingSpider(scrapy.Spider):
                     ],
                 )
         else:
-            self.logger.error(f"purchase response not success: {response.text}")
+            self.logger.error(f"purchase response not success: {response.url}")
 
 
 if __name__ == "__main__":

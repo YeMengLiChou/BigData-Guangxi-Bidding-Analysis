@@ -10,28 +10,28 @@ class CategoryApi(POSTBaseApi):
 
     @staticmethod
     def generate_body(
-        pageNo: int,
-        pageSize: int,
-        categoryCode: str,
-        publishDateBegin: str,
-        publishDateEnd: str,
+        page_no: int,
+        page_size: int,
+        category_code: str,
+        publish_date_begin: str,
+        publish_date_end: str,
     ) -> str:
         """
         返回请求体的json
-        :param categoryCode:
-        :param pageNo:
-        :param pageSize:
-        :param publishDateBegin:
-        :param publishDateEnd:
+        :param category_code:
+        :param page_no:
+        :param page_size:
+        :param publish_date_begin:
+        :param publish_date_end:
         :return:
         """
         return json.dumps(
             {
-                "pageNo": pageNo,
-                "pageSize": pageSize,
-                "categoryCode": categoryCode,
-                "publishDateBegin": publishDateBegin,
-                "publishDateEnd": publishDateEnd,
+                "pageNo": page_no,
+                "pageSize": page_size,
+                "categoryCode": category_code,
+                "publishDateBegin": publish_date_begin,
+                "publishDateEnd": publish_date_end,
                 "_t": int(datetime.now().timestamp()),
             }
         )

@@ -24,7 +24,7 @@ if not _client:
 
 # ========================== KEY CONSTANTS ========================= #
 
-KEY_ANNOUNCEMENT_LATEST_TIMESTAMP = "bidding:announcement:latest"
+KEY_ANNOUNCEMENT_LATEST_TIMESTAMP = "bidding:announcement:latest_timestamp"
 """
 数据库中最新的公告时间戳
 """

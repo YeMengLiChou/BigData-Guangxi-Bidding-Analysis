@@ -29,6 +29,8 @@ __ANNOUNCEMENT_TYPE_NOT_WIN = 1 << 2
 
 __ANNOUNCEMENT_TYPE_TERMINATION = 1 << 3
 
+pre_scraped_timestamp = 0
+
 
 @stats.function_stats(logger)
 def parse_response_data(data: list):
@@ -37,6 +39,8 @@ def parse_response_data(data: list):
     :param data:
     :return:
     """
+
+    global pre_scraped_timestamp
 
     def check_useful_announcement(path_name: str) -> int:
         """
@@ -80,9 +84,15 @@ def parse_response_data(data: list):
         else:
             is_win, is_termination = False, True
 
+        publish_date = int(item["publishDate"])
+        if publish_date < pre_scraped_timestamp:
+            logger.warning(f"scrape_timestamp `{publish_date}` less than pre `{pre_scraped_timestamp}` ")
+        else:
+            pre_scraped_timestamp = publish_date
+
         result_api_meta = {
             # 爬取的时间戳
-            constants.KEY_PROJECT_SCRAPE_TIMESTAMP: item["publishDate"],
+            constants.KEY_PROJECT_SCRAPE_TIMESTAMP: publish_date,
             # 结果公告的id（可能存在多个）
             constants.KEY_PROJECT_RESULT_ARTICLE_ID: item["articleId"],
             # 发布日期（可能存在多个）
@@ -137,10 +147,10 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
     else:
         # 废标结果部分
         if (
-            (("废标" in title or "流标") and ("原因" in title or "理由" in title))
-            or ("采购结果信息" in title)
-            or ("采购结果" in title)
-            or ("结果信息" in title)
+                (("废标" in title or "流标") and ("原因" in title or "理由" in title))
+                or ("采购结果信息" in title)
+                or ("采购结果" in title)
+                or ("结果信息" in title)
         ):
             return constants.PartKey.NOT_WIN_BID
         # 终止原因

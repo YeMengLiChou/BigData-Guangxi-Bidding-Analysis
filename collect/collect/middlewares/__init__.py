@@ -5,6 +5,7 @@ from collect.collect.middlewares.parseerror import (
     ParseErrorHandlerMiddleware,
 )
 from collect.collect.middlewares.useragent import UserAgentMiddleware
+from collect.collect.middlewares.timeout_proxy import TimeoutProxyDownloadMiddleware
 
 __all__ = [
     "ResponseDebugMiddleware",
@@ -12,4 +13,5 @@ __all__ = [
     "ParseErrorHandlerMiddleware",
     "ParseError",
     "UserAgentMiddleware",
+    "TimeoutProxyDownloadMiddleware"
 ]

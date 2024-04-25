@@ -9,9 +9,9 @@ host = "172.27.237.77"  # wsl
 port = 9092
 
 [kafka.scrapy]
-topic="scrapy_data"
+topic="scrapy_data_test"
 key="an"
 
 [debug]
-enable = true
-#enable = false
+#enable = true
+enable = false

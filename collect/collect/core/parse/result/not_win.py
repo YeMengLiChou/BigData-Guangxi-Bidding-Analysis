@@ -208,7 +208,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
 
         # 共用一个标项
         else:
-            logger.warning(f"废标理由共用：`{string}`")
+            logger.debug(f"废标理由共用：`{string}`")
             data[constants.KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE] = True
             item = common.get_template_bid_item(index=1, is_win=False)
             item[constants.KEY_BID_ITEM_REASON] = common.parse_bid_item_reason(string)

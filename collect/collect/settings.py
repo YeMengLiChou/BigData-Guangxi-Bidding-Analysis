@@ -17,17 +17,19 @@ CONCURRENT_REQUESTS = 16
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 0.5
+DOWNLOAD_DELAY = 0
 
 # 下载超时30
-DOWNLOAD_TIMEOUT = 15
+DOWNLOAD_TIMEOUT = 30
 
 # 对用一个响应的最大处理item数
 CONCURRENT_ITEMS = 64
 
 # 对同一个域名的最大并发请求数
-CONCURRENT_REQUESTS_PER_DOMAIN = 16
+CONCURRENT_REQUESTS_PER_DOMAIN = 24
 
+# 重试次数
+RETRY_TIMES = 5
 
 # 最大线程池大小
 REACTOR_THREADPOOL_MAXSIZE = 16
@@ -63,6 +65,7 @@ DOWNLOADER_MIDDLEWARES = {
     "collect.middlewares.ArticleIdFilterDownloadMiddleware": 12,
     "collect.middlewares.UserAgentMiddleware": 100,
     "collect.middlewares.ResponseDebugMiddleware": 100,
+    "collect.middlewares.TimeoutProxyDownloadMiddleware": 100,
     "scrapy.downloadermiddlewares.downloadtimeout.DownloadTimeoutMiddleware": 500,
 }
 
@@ -105,7 +108,7 @@ REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
-LOG_LEVEL=logging.DEBUG
+LOG_LEVEL=logging.INFO
 # LOG_FILE="logs/out.log"
 
 # 内存调试，显示内存使用情况

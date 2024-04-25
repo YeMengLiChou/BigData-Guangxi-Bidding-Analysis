@@ -66,19 +66,12 @@ class LogStats:
         residual_crawl_count = planned_crawl_count - actual_crawl_count
         msg = (
             "Crawled info:\n"
-            "redis:\n"
-            "\tlatest timestamp: %(latest_timestamp)s\n"
-            "\tprocess_announcement_count: %(process_announcement_count)d\n"
-            "\tprocess_item_count: %(process_item_count)d\n"
-            "kafka:\n "
-            "\tsend items: %(send_item_count)d\n"
-            "\tsend failed: %(failed_item_count)d\n"
-            "error:\n"
-            "\tparse error count: %(parse_error_count)d\n"
-            "current:\n"
-            "\tfiltered count: %(filtered_count)d\n"
-            "\tactual crawl count: %(actual_crawl_count)d\n"
-            "\tresidual crawl count: %(residual_crawl_count)d"
+            "redis(%(latest_timestamp)s): { ids: %(process_announcement_count)d, items: %("
+            "process_item_count)d }\n"
+            "kafka: { sent: %(send_item_count)d, failed: %(failed_item_count)d }\n"
+            "error: { parse_error: %(parse_error_count)d }\n"
+            "current: { filter: %(filtered_count)d, actual: %(actual_crawl_count)d, remain: %("
+            "residual_crawl_count)d }"
         )
         log_args = {
             "latest_timestamp": latest_timestamp,
