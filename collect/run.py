@@ -74,7 +74,11 @@ def configure_logging(settings: Settings):
         handler.setFormatter(formatter)
         if settings.getbool("LOG_SHORT_NAMES"):  # 是否缩写
             handler.addFilter(log.TopLevelFormatter(["scrapy"]))
-        logging.root.handlers.append(handler)
+
+        logging.basicConfig(
+            level=level,
+            handlers=[handler],
+        )
 
     else:
         coloredlogs.install(

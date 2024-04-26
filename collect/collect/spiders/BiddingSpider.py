@@ -177,13 +177,8 @@ class BiddingSpider(scrapy.Spider):
         # 从redis中读取最新的公告时间戳
         redis_timestamp = redis.get_latest_announcement_timestamp(parse_to_str=True)
 
-        # self.publish_date_begin = redis_timestamp or "2022-01-01"
-        # self.publish_date_end = redis.parse_timestamp(
-        #     timestamp=time_tools.now_timestamp()
-        # )
-
         self.publish_date_begin = datetime.datetime(year=2022, month=1, day=1)
-        self.publish_date_end = datetime.datetime(year=2022, month=1, day=30)
+        self.publish_date_end = datetime.datetime(year=2024, month=4, day=30)
         logging.info(
             f"Ensured span:\n"
             f"redis_latest_timestamp: {redis_timestamp}\n"
@@ -445,7 +440,8 @@ class BiddingSpider(scrapy.Spider):
                 # 查重
                 if redis.check_article_id_exist(article_id):
                     logger.info(f"公告 {article_id} 已经爬取过，跳过该公告")
-                    self.crawler.stats.inc_value("scraped/duplicated")
+                    self.crawler.stats.inc_value(constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT)
+                    self.crawler.stats.inc_value(constants.StatsKey.FILTERED_COUNT)
                     continue
 
                 yield _make_detail_request(

@@ -108,8 +108,8 @@ REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
-LOG_LEVEL = logging.DEBUG
-# LOG_FILE="logs/out.log"
+LOG_LEVEL = logging.INFO
+LOG_FILE="logs/out.log"
 
 # 内存调试，显示内存使用情况
 MEMDEBUG_ENABLED = True
