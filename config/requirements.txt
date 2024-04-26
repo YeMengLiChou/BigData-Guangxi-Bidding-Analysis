@@ -6,4 +6,3 @@ redis==5.0.3  # cache database
 black==24.3.0  # code reformat
 kafka-python==2.0.2  # for kafka
 pyspark==3.5.1 # for spark
-pyspark-stubs==3.0.0.post3
