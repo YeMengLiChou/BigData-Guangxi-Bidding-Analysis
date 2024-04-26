@@ -12,6 +12,9 @@ port = 9092
 topic="scrapy_data_test"
 key="an"
 
+[kafka.spark]
+topic="scrapy_data_test"
+
 [debug]
 #enable = true
 enable = false

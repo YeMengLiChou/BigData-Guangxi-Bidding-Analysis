@@ -4,4 +4,6 @@ dynaconf==3.2.5  # config
 coloredlogs==15.0.1  # colorful logs
 redis==5.0.3  # cache database
 black==24.3.0  # code reformat
-kafka-python==2.0.2
+kafka-python==2.0.2  # for kafka
+pyspark==3.5.1 # for spark
+pyspark-stubs==3.0.0.post3
