@@ -1,3 +1,4 @@
+import datetime
 import logging
 from typing import Union
 
@@ -6,7 +7,7 @@ from scrapy.crawler import Crawler
 from scrapy.statscollectors import StatsCollector
 
 import utils.redis_tools as redis
-from constant import constants
+from constants import StatsKey, ProjectKey
 
 logger = logging.getLogger(__name__)
 
@@ -28,12 +29,12 @@ class UpdateRedisInfoPipeline:
     def spider_close(self):
         # 最新公告的时间
         self.stats.set_value(
-            constants.StatsKey.REDIS_LATEST_TIMESTAMP,
+            StatsKey.REDIS_LATEST_TIMESTAMP,
             redis.get_latest_announcement_timestamp(parse_to_str=True),
         )
         # 已经爬取的公告总数
         self.stats.set_value(
-            constants.StatsKey.REDIS_SCRAPED_ANNOUNCEMENT_COUNT,
+            StatsKey.REDIS_SCRAPED_ANNOUNCEMENT_COUNT,
             redis.count_article_ids(),
         )
 
@@ -41,19 +42,23 @@ class UpdateRedisInfoPipeline:
         if getattr(spider, "debug", False):
             return item
 
-        self.stats.inc_value(constants.StatsKey.REDIS_UPDATE_PROCESS_ITEM_COUNT)
+        self.stats.inc_value(StatsKey.REDIS_UPDATE_PROCESS_ITEM_COUNT)
         # 更新两个公告的id
-        purchase_id = item.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, [])
-        result_id = item.get(constants.KEY_PROJECT_RESULT_ARTICLE_ID, [])
+        purchase_id = item.get(ProjectKey.PURCHASE_ARTICLE_ID, [])
+        result_id = item.get(ProjectKey.RESULT_ARTICLE_ID, [])
 
         # 更新已经爬取的公告
         redis.add_unique_article_ids(purchase_id)
         redis.add_unique_article_ids(result_id)
 
         # 更新最新的公告时间戳
-        scrape_timestamp: Union[int, None] = item.get(
-            constants.KEY_PROJECT_SCRAPE_TIMESTAMP, None
-        )
+        scrape_timestamp: Union[int, None] = item.get(ProjectKey.SCRAPE_TIMESTAMP, None)
         if scrape_timestamp:
             redis.set_latest_announcement_timestamp(timestamp=scrape_timestamp)
+
+        # 增加item的数量
+        d = datetime.datetime.fromtimestamp(scrape_timestamp / 1000)
+        time_desc = f"{d.year}-{d.month}"
+        redis.increment_items_amount(time_desc)
+
         return item

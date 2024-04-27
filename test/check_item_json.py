@@ -1,6 +1,6 @@
 import json
 
-import constant.constants
+import constants.constants
 
 
 def check_item_json(json_data: list):
@@ -9,9 +9,9 @@ def check_item_json(json_data: list):
     :param json_data:
     :return:
     """
-    keys = [item for item in dir(constant.constants) if item.startswith("KEY_")]
-    project_keys = set(getattr(constant.constants, item) for item in keys if item.startswith("KEY_PROJECT_"))
-    bid_item_keys = set(getattr(constant.constants, item) for item in keys if item.startswith("KEY_BID_ITEM_"))
+    keys = [item for item in dir(constants.constants) if item.startswith("KEY_")]
+    project_keys = set(getattr(constants.constants, item) for item in keys if item.startswith("KEY_PROJECT_"))
+    bid_item_keys = set(getattr(constants.constants, item) for item in keys if item.startswith("KEY_BID_ITEM_"))
 
     index = 0
     for item in json_data:
@@ -20,7 +20,7 @@ def check_item_json(json_data: list):
         if len(dis) != 0:
             print(f"{item} \n 缺乏的 key {dis}\n")
             ok = False
-        bid_items = item.get(constant.constants.KEY_PROJECT_BID_ITEMS, None)
+        bid_items = item.get(constants.constants.KEY_PROJECT_BID_ITEMS, None)
         if not bid_items:
             print(f"{item} \n 缺少 bid_items")
             ok = False
@@ -33,7 +33,7 @@ def check_item_json(json_data: list):
 
         index += 1
         if not ok:
-            print(f"{index} not ok {item[constant.constants.KEY_PROJECT_RESULT_ARTICLE_ID]}\n")
+            print(f"{index} not ok {item[constants.constants.KEY_PROJECT_RESULT_ARTICLE_ID]}\n")
 
         government_purchase = item['is_government_purchase']
         if government_purchase:
@@ -41,9 +41,9 @@ def check_item_json(json_data: list):
 
 
 def print_values(json_data: list):
-    keys = [item for item in dir(constant.constants) if item.startswith("KEY_")]
-    project_keys = set(getattr(constant.constants, item) for item in keys if item.startswith("KEY_PROJECT_"))
-    bid_item_keys = set(getattr(constant.constants, item) for item in keys if item.startswith("KEY_BID_ITEM_"))
+    keys = [item for item in dir(constants.constants) if item.startswith("KEY_")]
+    project_keys = set(getattr(constants.constants, item) for item in keys if item.startswith("KEY_PROJECT_"))
+    bid_item_keys = set(getattr(constants.constants, item) for item in keys if item.startswith("KEY_BID_ITEM_"))
 
     for key in project_keys:
         print(f"---------{key}-------------")

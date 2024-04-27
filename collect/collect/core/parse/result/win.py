@@ -8,7 +8,7 @@ from collect.collect.core.parse import (
 from collect.collect.middlewares import ParseError
 from utils import symbol_tools
 from utils import debug_stats as stats
-from constant import constants
+from constants import ProjectKey, BidItemKey, PartKey
 
 logger = logging.getLogger(__name__)
 
@@ -18,32 +18,30 @@ def parse_win_bid(parts: dict[int, list[str]]) -> dict:
     """
     解析 中标结果
     :param parts:
-    :return: 返回包含 `KEY_PROJECT_BID_ITEMS`、 `KEY_PROJECT_REVIEW_EXPERT` 和 `KEY_PROJECT_PURCHASE_REPRESENTATIVE` 的数据
+    :return: 返回包含 `ProjectKey.BID_ITEMS`、 `ProjectKey.REVIEW_EXPERT` 和 `ProjectKey.PURCHASE_REPRESENTATIVE` 的数据
     """
 
     data = dict()
     bid_items = []
-    data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
+    data[ProjectKey.BID_ITEMS] = bid_items
 
     # 解析 标项信息
-    if constants.PartKey.WIN_BID in parts:
+    if PartKey.WIN_BID in parts:
         bid_items.extend(
             WinBidStandardFormatParser.parse_bids_information(
-                part=parts[constants.PartKey.WIN_BID]
+                part=parts[PartKey.WIN_BID]
             )
         )
     # 解析 评审专家信息
-    if constants.PartKey.REVIEW_EXPERT in parts:
+    if PartKey.REVIEW_EXPERT in parts:
         data.update(
             WinBidStandardFormatParser.parse_review_expert(
-                part=parts[constants.PartKey.REVIEW_EXPERT]
+                part=parts[PartKey.REVIEW_EXPERT]
             )
         )
     # 解析 联系方式信息
-    if constants.PartKey.CONTACT in parts:
-        data.update(
-            common.parse_contact_info(part="".join(parts[constants.PartKey.CONTACT]))
-        )
+    if PartKey.CONTACT in parts:
+        data.update(common.parse_contact_info(part="".join(parts[PartKey.CONTACT])))
 
     return data
 
@@ -126,10 +124,10 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 amount, is_percent = AbstractFormatParser.parse_amount(
                     amount_str=price_text
                 )
-                bid_item[constants.KEY_BID_ITEM_AMOUNT] = amount
-                bid_item[constants.KEY_BID_ITEM_IS_PERCENT] = is_percent
-                bid_item[constants.KEY_BID_ITEM_SUPPLIER] = supplier_text
-                bid_item[constants.KEY_BID_ITEM_SUPPLIER_ADDRESS] = address_text
+                bid_item[BidItemKey.AMOUNT] = amount
+                bid_item[BidItemKey.IS_PERCENT] = is_percent
+                bid_item[BidItemKey.SUPPLIER] = supplier_text
+                bid_item[BidItemKey.SUPPLIER_ADDRESS] = address_text
                 data.append(bid_item)
             else:
                 idx += 1
@@ -154,9 +152,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 # 当前 idx 为序号
                 bid_item = common.get_template_bid_item(index=index, is_win=False)
                 # 标项名称
-                bid_item[constants.KEY_BID_ITEM_NAME] = part[idx + 1]
+                bid_item[BidItemKey.NAME] = part[idx + 1]
                 # 废标理由
-                bid_item[constants.KEY_BID_ITEM_REASON] = part[idx + 2]
+                bid_item[BidItemKey.REASON] = part[idx + 2]
 
                 # 某些情况下:  其他事项这一列为空，导致在预处理的时候就已经被过滤掉，这里需要判断一下
                 if idx + 3 < n:
@@ -246,9 +244,9 @@ class WinBidStandardFormatParser(AbstractFormatParser):
 
         while idx < n:
             if "供应商名称" in part[idx]:
-                get_content(constants.KEY_BID_ITEM_SUPPLIER)
+                get_content(BidItemKey.SUPPLIER)
             elif "供应商地址" in part[idx]:
-                get_content(constants.KEY_BID_ITEM_SUPPLIER_ADDRESS)
+                get_content(BidItemKey.SUPPLIER_ADDRESS)
             elif (
                 "中标（成交）金额" in part[idx]
                 or "中标金额" in part[idx]
@@ -275,8 +273,8 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 amount, is_percent = AbstractFormatParser.parse_amount(
                     amount_str=amount_text
                 )
-                item[constants.KEY_BID_ITEM_AMOUNT] = amount
-                item[constants.KEY_BID_ITEM_IS_PERCENT] = is_percent
+                item[BidItemKey.AMOUNT] = amount
+                item[BidItemKey.IS_PERCENT] = is_percent
                 cnt += 1
             else:
                 idx += 1

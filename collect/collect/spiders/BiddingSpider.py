@@ -17,12 +17,12 @@ from collect.collect.core.error import SwitchError
 from collect.collect.core.parse import result, purchase, common
 from collect.collect.core.parse.result import errorhandle
 from collect.collect.middlewares import ParseError
+from constants import ProjectKey, CollectDevKey, StatsKey
 from utils import (
     redis_tools as redis,
     time as time_tools,
 )
 from utils import debug_stats as stats
-from constant import constants
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def _make_detail_request(article_id: str, callback: callable, meta: dict):
     :param meta:
     :return:
     """
-    scraped_timestamp = meta.get(constants.KEY_PROJECT_SCRAPE_TIMESTAMP, 0)
+    scraped_timestamp = meta.get(ProjectKey.SCRAPE_TIMESTAMP, 0) + 1
     return scrapy.Request(
         url=DetailApi.get_complete_url(article_id),
         callback=callback,
@@ -81,7 +81,7 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
 
     # 如果已经解析过了，则无需解析，（存在于前一个结果公告不能解析，切换到下一个解析）
     # 第一次解析时，不存在该键
-    if meta.get(constants.KEY_DEV_START_RESULT_ARTICLE_ID, None):
+    if meta.get(CollectDevKey.START_RESULT_ARTICLE_ID, None):
         return
 
     # 所有结果公告
@@ -131,19 +131,19 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
             )
 
     # 拿到当前的结果公告
-    current_result_id = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
+    current_result_id = meta[ProjectKey.RESULT_ARTICLE_ID]
 
-    meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID] = result_article_ids
-    meta[constants.KEY_PROJECT_RESULT_PUBLISH_DATE] = result_publish_dates
+    meta[ProjectKey.RESULT_ARTICLE_ID] = result_article_ids
+    meta[ProjectKey.RESULT_PUBLISH_DATE] = result_publish_dates
 
-    meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = purchase_article_ids
-    meta[constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE] = purchase_publish_dates
+    meta[ProjectKey.PURCHASE_ARTICLE_ID] = purchase_article_ids
+    meta[ProjectKey.PURCHASE_PUBLISH_DATE] = purchase_publish_dates
 
     # 标记该公告机已经解析
     parsed_result_id = 1 << result_article_ids.index(current_result_id)
-    meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID] = parsed_result_id
+    meta[CollectDevKey.PARRED_RESULT_ARTICLE_ID] = parsed_result_id
     # 从现在开始
-    meta[constants.KEY_DEV_START_RESULT_ARTICLE_ID] = current_result_id
+    meta[CollectDevKey.START_RESULT_ARTICLE_ID] = current_result_id
 
     # 计算招标持续时间
     tender_duration = max_publish_date - min_publish_date
@@ -158,7 +158,7 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
                 ],
             ],
         )
-    meta[constants.KEY_PROJECT_TENDER_DURATION] = tender_duration
+    meta[ProjectKey.TENDER_DURATION] = tender_duration
 
 
 class BiddingSpider(scrapy.Spider):
@@ -172,13 +172,13 @@ class BiddingSpider(scrapy.Spider):
         return obj
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        scrapy.Spider.__init__(self, *args, **kwargs)
 
         # 从redis中读取最新的公告时间戳
         redis_timestamp = redis.get_latest_announcement_timestamp(parse_to_str=True)
 
         self.publish_date_begin = datetime.datetime(year=2022, month=1, day=1)
-        self.publish_date_end = datetime.datetime(year=2024, month=4, day=30)
+        self.publish_date_end = datetime.datetime(year=2022, month=1, day=1)
         logging.info(
             f"Ensured span:\n"
             f"redis_latest_timestamp: {redis_timestamp}\n"
@@ -327,11 +327,9 @@ class BiddingSpider(scrapy.Spider):
                     article_id=urllib.parse.unquote(article_id),
                     callback=self.parse_result_detail_content,
                     meta={
-                        constants.KEY_PROJECT_RESULT_ARTICLE_ID: urllib.parse.unquote(
-                            article_id
-                        ),
-                        constants.KEY_PROJECT_SCRAPE_TIMESTAMP: 0,
-                        constants.KEY_PROJECT_IS_WIN_BID: is_win,
+                        ProjectKey.RESULT_ARTICLE_ID: urllib.parse.unquote(article_id),
+                        ProjectKey.SCRAPE_TIMESTAMP: 0,
+                        ProjectKey.IS_WIN_BID: is_win,
                     },
                 )
         else:
@@ -376,12 +374,10 @@ class BiddingSpider(scrapy.Spider):
         success = data["success"]
         if success:
             total = int(data["result"]["data"]["total"])
-            self.crawler.stats.inc_value(
-                constants.StatsKey.SPIDER_PLANNED_CRAWL_COUNT, total
-            )
+            self.crawler.stats.inc_value(StatsKey.SPIDER_PLANNED_CRAWL_COUNT, total)
             # 当前的总数
             total_count = self.crawler.stats.get_value(
-                constants.StatsKey.SPIDER_PLANNED_CRAWL_COUNT
+                StatsKey.SPIDER_PLANNED_CRAWL_COUNT
             )
             self.logger.info(f"total fetch count: {total_count}")
 
@@ -435,13 +431,13 @@ class BiddingSpider(scrapy.Spider):
 
             # 对于列表中的每个公告数据，都拿到所需要的数据 meta，进而生成对应的请求
             for meta in result.parse_response_data(data):
-                article_id = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
+                article_id = meta[ProjectKey.RESULT_ARTICLE_ID]
 
                 # 查重
                 if redis.check_article_id_exist(article_id):
-                    logger.info(f"公告 {article_id} 已经爬取过，跳过该公告")
-                    self.crawler.stats.inc_value(constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT)
-                    self.crawler.stats.inc_value(constants.StatsKey.FILTERED_COUNT)
+                    logger.debug(f"公告 {article_id} 已经爬取过，跳过该公告")
+                    self.crawler.stats.inc_value(StatsKey.SPIDER_ACTUAL_CRAWL_COUNT)
+                    self.crawler.stats.inc_value(StatsKey.FILTERED_COUNT)
                     continue
 
                 yield _make_detail_request(
@@ -466,14 +462,14 @@ class BiddingSpider(scrapy.Spider):
 
             # 统计已经爬取到的公告数量
             self.crawler.stats.inc_value(
-                constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT,
+                StatsKey.SPIDER_ACTUAL_CRAWL_COUNT,
             )
 
             # 解析 html 结果
             try:
                 if data:
-                    meta[constants.KEY_PROJECT_CODE] = data["projectCode"]
-                    meta[constants.KEY_PROJECT_NAME] = data["projectName"]
+                    meta[ProjectKey.CODE] = data["projectCode"]
+                    meta[ProjectKey.NAME] = data["projectName"]
                     title = data["title"]
 
                     # 公开征集公告省略
@@ -483,10 +479,10 @@ class BiddingSpider(scrapy.Spider):
 
                     # TODO: 判断是否为中标候选人公示，后期完善
                     if title and ("中标候选人" in title):
-                        meta[constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE] = True
+                        meta[CollectDevKey.RESULT_CONTAINS_CANDIDATE] = True
 
-                    if constants.KEY_PROJECT_DISTRICT_CODE not in meta:
-                        meta[constants.KEY_PROJECT_DISTRICT_CODE] = data["districtCode"]
+                    if ProjectKey.DISTRICT_CODE not in meta:
+                        meta[ProjectKey.DISTRICT_CODE] = data["districtCode"]
 
                     # 解析其他公告
                     _parse_other_announcements(
@@ -502,7 +498,7 @@ class BiddingSpider(scrapy.Spider):
                     meta.update(
                         result.parse_html(
                             html_content=data["content"],
-                            is_win_bid=meta[constants.KEY_PROJECT_IS_WIN_BID],
+                            is_win_bid=meta[ProjectKey.IS_WIN_BID],
                         )
                     )
                 else:
@@ -513,14 +509,12 @@ class BiddingSpider(scrapy.Spider):
                 return
             else:
                 # 没有出现 SwitchError 则解析采购公告
-                purchase_article_ids = meta.get(
-                    constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, []
-                )
+                purchase_article_ids = meta.get(ProjectKey.PURCHASE_ARTICLE_ID, [])
 
                 if len(purchase_article_ids) == 0:
                     # 没有 “采购公告”，直接进入 make_item 生成 item
                     try:
-                        yield common.make_item(data=meta, purchase_data=None)
+                        yield common.make_item(result_data=meta, purchase_data=None)
                     except BaseException as e:
                         errorhandle.raise_error(
                             e,
@@ -546,16 +540,16 @@ class BiddingSpider(scrapy.Spider):
         """
 
         # 已经解析的列表
-        result_ids = meta[constants.KEY_PROJECT_RESULT_ARTICLE_ID]
+        result_ids = meta[ProjectKey.RESULT_ARTICLE_ID]
         if not isinstance(result_ids, list):
             raise ParseError(
                 msg="switch_other_announcement 存在异常，未解析 result_ids 为 list",
                 content=["error result_ids", result_ids],
             )
         # 前一个公告id
-        parsed_result_id: int = meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID]
+        parsed_result_id: int = meta[CollectDevKey.PARRED_RESULT_ARTICLE_ID]
         # 最开始的结果公告
-        start_result_id = meta[constants.KEY_DEV_START_RESULT_ARTICLE_ID]
+        start_result_id = meta[CollectDevKey.START_RESULT_ARTICLE_ID]
         # 下一个需要切换的结果公告id
         next_result_id, next_idx = None, -1
         m = len(result_ids)
@@ -581,7 +575,7 @@ class BiddingSpider(scrapy.Spider):
             logger.warning(f"已经切换到 {next_result_id} 结果公告进行爬取")
             # 标记该结果已经解析了
             parsed_result_id |= 1 << next_idx
-            meta[constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID] = parsed_result_id
+            meta[CollectDevKey.PARRED_RESULT_ARTICLE_ID] = parsed_result_id
             return _make_detail_request(
                 article_id=next_result_id,
                 callback=self.parse_result_detail_content,
@@ -603,8 +597,8 @@ class BiddingSpider(scrapy.Spider):
         :param meta:
         :return:
         """
-        parsed: int = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
-        purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+        parsed: int = meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID]
+        purchase_ids = meta[ProjectKey.PURCHASE_ARTICLE_ID]
         for i in range(len(purchase_ids)):
             if ((parsed >> i) & 1) == 0:
                 return _make_detail_request(
@@ -619,7 +613,7 @@ class BiddingSpider(scrapy.Spider):
             logger.debug(
                 f"采购公告 {purchase_ids} 没有解析到任何标项信息， 直接生成 item"
             )
-            return common.make_item(data=meta, purchase_data=None)
+            return common.make_item(result_data=meta, purchase_data=None)
 
     @stats.function_stats(logger)
     def parse_purchase(self, response: Response):
@@ -637,31 +631,29 @@ class BiddingSpider(scrapy.Spider):
 
             try:
                 # 首先判断是不是第一次解析采购公告
-                if constants.KEY_DEV_START_PURCHASE_ARTICLE_ID not in meta:
+                if CollectDevKey.START_PURCHASE_ARTICLE_ID not in meta:
                     # 当前公告id
                     current_id = get_article_id_from_url(response.url)
-                    meta[constants.KEY_DEV_START_PURCHASE_ARTICLE_ID] = current_id
+                    meta[CollectDevKey.START_PURCHASE_ARTICLE_ID] = current_id
                     # 定位解析位置
-                    purchase_ids: list = meta[
-                        constants.KEY_DEV_START_PURCHASE_ARTICLE_ID
-                    ]
+                    purchase_ids: list = meta[CollectDevKey.START_PURCHASE_ARTICLE_ID]
                     index = purchase_ids.index(current_id)
                     parsed = 1 << index
                     # 标记当前位置
-                    meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
+                    meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID] = parsed
                 else:
                     # 当前公告id
                     current_id = get_article_id_from_url(response.url)
-                    parsed = meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID]
-                    purchase_ids = meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]
+                    parsed = meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID]
+                    purchase_ids = meta[ProjectKey.PURCHASE_ARTICLE_ID]
                     index = purchase_ids.index(current_id)
                     parsed |= 1 << index
-                    meta[constants.KEY_DEV_PARRED_PURCHASE_ARTICLE_ID] = parsed
+                    meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID] = parsed
 
                 # 某些文章id返回的数据为None，需要预选处理
                 if data is None:
                     logger.warning(
-                        f" {meta[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID]} 中存在data为None的 id"
+                        f" {meta[ProjectKey.PURCHASE_ARTICLE_ID]} 中存在data为None的 id"
                     )
                     yield self.switch_other_purchase_announcement(meta)
                     return None
@@ -678,7 +670,7 @@ class BiddingSpider(scrapy.Spider):
                 purchase_data = purchase.parse_html(html_content=data["content"])
 
                 # 生成 item
-                yield common.make_item(data=meta, purchase_data=purchase_data)
+                yield common.make_item(result_data=meta, purchase_data=purchase_data)
             except SwitchError:
                 logger.warning("采购公告没有标项信息")
                 yield self.switch_other_purchase_announcement(meta=meta)
@@ -689,8 +681,8 @@ class BiddingSpider(scrapy.Spider):
                     "生成 item 时出现异常",
                     content=[
                         "result_data",
-                        list(data.items()),
-                        "------- split line ----------------",
+                        list(meta.items()),
+                        "|- split line -|",
                         "purchase_data",
                         list(purchase_data.items()),
                     ],

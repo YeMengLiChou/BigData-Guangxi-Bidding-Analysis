@@ -1,17 +1,16 @@
 import json
 import logging
 import os
-import pathlib
-import pickle
 import traceback
 import urllib.parse
-from typing import Union, Any
+from logging.handlers import RotatingFileHandler
+from typing import Union, TextIO
 
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 from scrapy.http import Response
 
-from constant import constants
+from constants import ProjectKey, CollectDevKey, StatsKey
 from utils import time
 
 logger = logging.getLogger(__name__)
@@ -21,16 +20,16 @@ class ParseError(Exception):
     """自定义解析错误"""
 
     def __init__(
-        self,
-        msg: str,
-        article_id: Union[list, None] = None,
-        start_article_id: Union[str, None] = None,
-        parsed_article_id: int = 0,
-        article_ids: Union[list[str], None] = None,
-        is_win: Union[bool, None] = None,
-        content: Union[list, None] = None,
-        error: Union[BaseException, None] = None,
-        timestamp: int = time.now_timestamp(),
+            self,
+            msg: str,
+            article_id: Union[list, None] = None,
+            start_article_id: Union[str, None] = None,
+            parsed_article_id: int = 0,
+            article_ids: Union[list[str], None] = None,
+            is_win: Union[bool, None] = None,
+            content: Union[list, None] = None,
+            error: Union[BaseException, None] = None,
+            timestamp: int = time.now_timestamp(),
     ):
         """
         :param msg: 出错原因
@@ -98,21 +97,6 @@ class ParseError(Exception):
         }
 
 
-def ensure_file_exist(file: str):
-    """
-    确保日志文件存在
-    :return:
-    """
-    # 文件不存在则创建
-    path = pathlib.Path(file)
-    if not path.exists():
-        # 先创建目录
-        path_directory = path.parent
-        path_directory.mkdir(parents=True, exist_ok=True)
-        # 再创建文件
-        path.touch(exist_ok=True)
-
-
 def complete_error(error: ParseError, response: Response):
     """
     补充部分信息
@@ -121,7 +105,7 @@ def complete_error(error: ParseError, response: Response):
     :return:
     """
     if not error.is_win:
-        error.is_win = response.meta.get(constants.KEY_PROJECT_IS_WIN_BID, None)
+        error.is_win = response.meta.get(ProjectKey.IS_WIN_BID, None)
     # 出现错误的url
     if not error.article_id:
         param = urllib.parse.urlparse(url=response.url).query
@@ -129,30 +113,26 @@ def complete_error(error: ParseError, response: Response):
         error.article_id = param.get("articleId", None)[0]
     # 所有公告id
     if not error.article_ids:
-        error.article_ids = response.meta.get(
-            constants.KEY_PROJECT_RESULT_ARTICLE_ID, None
-        )
+        error.article_ids = response.meta.get(ProjectKey.RESULT_ARTICLE_ID, None)
         if not error.article_ids:
-            error.article_ids = response.meta.get(
-                constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None
-            )
+            error.article_ids = response.meta.get(ProjectKey.PURCHASE_ARTICLE_ID, None)
         else:
             if isinstance(error.article_ids, str):
                 error.article_ids = [error.article_ids]
 
             error.article_ids.append("|")
             error.article_ids.extend(
-                response.meta.get(constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, None)
+                response.meta.get(ProjectKey.PURCHASE_ARTICLE_ID, None)
             )
     # 最开始的id
     if not error.start_article_id:
         error.start_article_id = response.meta.get(
-            constants.KEY_DEV_START_RESULT_ARTICLE_ID, None
+            CollectDevKey.START_RESULT_ARTICLE_ID, None
         )
     # 解析过后的id标记
     if error.parsed_article_id == 0:
         error.parsed_article_id = response.meta.get(
-            constants.KEY_DEV_PARRED_RESULT_ARTICLE_ID, 0
+            CollectDevKey.PARRED_RESULT_ARTICLE_ID, 0
         )
 
     if len(error.exc_info) == 0:
@@ -160,32 +140,37 @@ def complete_error(error: ParseError, response: Response):
 
 
 class ParseErrorHandlerMiddleware:
-    """解析错误统一处理中间件"""
+    """
+    解析错误统一处理中间件
+    """
 
     LOG_FILE_NAME = "parse_errors.log"
 
     JSON_FILE_NAME = "parse_errors.json"
 
-    PICKLE_FILE_NAME = "parse_errors.pickle"
-
     def __init__(self, crawler: Crawler):
-        self.exceptions: Union[dict[str, Any], None] = None
-        self.articleIds: Union[set[str], None] = None
-
         settings = crawler.settings
         self.contains_response_body = settings.get(
             "PARSE_ERROR_CONTAINS_RESPONSE_BODY", True
         )
+
         self.log_format = settings.get("LOG_FORMAT")
         self.log_dateformat = settings.get("LOG_DATEFORMAT")
         self.log_dir = settings.get("PARSE_ERROR_LOG_DIR", "logs")
         self.log_path = os.path.join(self.log_dir, self.LOG_FILE_NAME)
-        self.pickle_path = os.path.join(self.log_dir, self.PICKLE_FILE_NAME)
         self.json_path = os.path.join(self.log_dir, self.JSON_FILE_NAME)
 
-        crawler.stats.set_value(constants.StatsKey.PARSE_ERROR_TOTAL, 0)
-        crawler.stats.set_value(constants.StatsKey.PARSE_ERROR_DUPLICATED, 0)
-        crawler.stats.set_value(constants.StatsKey.PARSE_ERROR_NON_DUPLICATED, 0)
+        self.json_fp: Union[TextIO, None] = None
+        self.json_first_write = True
+        if os.path.exists(self.json_path):
+            if os.path.isdir(self.json_path):
+                raise ValueError(f"JSON_FILE_NAME`{self.JSON_FILE_NAME}` is a directory!")
+
+            if os.path.getsize(self.json_path) > 0:
+                self.json_first_write = False
+
+        crawler.stats.set_value(StatsKey.PARSE_ERROR_TOTAL, 0)
+        crawler.stats.set_value(StatsKey.PARSE_ERROR_AMOUNT, 0)
         logger.debug(
             f"Using config(PARSE_ERROR_LOG_DIR={self.log_dir})",
         )
@@ -199,9 +184,10 @@ class ParseErrorHandlerMiddleware:
         return obj
 
     def _init_logger(self):
-        ensure_file_exist(self.log_path)
-        handler = logging.FileHandler(
+        handler = RotatingFileHandler(
             filename=self.log_path,
+            backupCount=5,
+            maxBytes=1024 * 1024 * 10,  # 10M
             encoding="utf-8",
             mode="a",
         )
@@ -210,39 +196,10 @@ class ParseErrorHandlerMiddleware:
         handler.setFormatter(fmt)
         logger.addHandler(handler)
 
-    def _load_pickle(self):
-        try:
-            with open(self.pickle_path, "rb") as f:
-                self.exceptions = pickle.load(f)
-            self.articleIds = self.exceptions["ids"]
-        except Exception as e:
-            logger.error(e)
-            self.exceptions = {
-                "error": list[ParseError](),
-                "ids": set[str](),
-            }
-            self.articleIds = self.exceptions["ids"]
-
     def spider_opened(self):
         self.closed = False
+        self.json_fp = open(self.json_path, "a", encoding="utf-8")
         self._init_logger()
-        try:
-            self._load_pickle()
-            logger.debug(
-                f"pickle load from `{self.pickle_path}` successfully, total {len(self.exceptions['error'])} records"
-            )
-        except Exception as e:
-            logger.warning(e)
-
-    def _dumps_pickle(self):
-        with open(self.pickle_path, "wb") as f:
-            pickle.dump(self.exceptions, f)
-
-    def _write_json(self):
-        ensure_file_exist(self.json_path)
-        json_data = [d.to_dict() for d in self.exceptions.get("error", [])]
-        with open(self.json_path, "w", encoding="utf-8") as f:
-            json.dump(json_data, f, indent=4, ensure_ascii=False)
 
     def spider_closed(self):
         """
@@ -253,75 +210,37 @@ class ParseErrorHandlerMiddleware:
             return
         self.closed = True
 
-        logger.debug(self.exceptions)
-
-        try:
-            self._dumps_pickle()
-            logger.debug("pickle dumps successfully!")
-        except Exception as e:
-            logger.warning("dumps to file failed!")
-            logger.exception(e)
-
-        try:
-            self._write_json()
-            logger.debug("write json successfully!")
-        except Exception as e:
-            logger.warning("write json failed!")
-            logger.exception(e)
-
-    def _check_url_duplicated(self, url: str) -> str | None:
-        """
-        检查url是否重复，通过判断articleId
-        :param url:
-        :return: 如果不重复，则返回对应的articleId，否则返回one
-        """
-        parsed_url = urllib.parse.urlparse(url)
-        param = urllib.parse.parse_qs(parsed_url.query)
-        if "articleId" not in param:
-            return None
-        article_id = param["articleId"][0]
-        return None if (article_id in self.articleIds) else article_id
-
     def process_spider_exception(
-        self, response: Response, exception: BaseException, spider: Spider
+            self, response: Response, exception: BaseException, spider: Spider
     ):
         # 处理 ParseError
         if isinstance(exception, ParseError):
             exception: ParseError
             complete_error(exception, response)
-            url = response.url
+
             # 总数+1
-            spider.crawler.stats.inc_value(constants.StatsKey.PARSE_ERROR_TOTAL)
+            spider.crawler.stats.inc_value(StatsKey.PARSE_ERROR_TOTAL)
 
             # 如果包含了候选人公示，则选择不处理
-            if response.meta.get(constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE, False):
+            if response.meta.get(CollectDevKey.RESULT_CONTAINS_CANDIDATE, False):
                 return []
 
-            article_id = self._check_url_duplicated(url)
-            if not article_id:
-                logger.warning(
-                    f"catch a duplicated parse error:\n"
-                    f"id: {exception.article_id}\n"
-                    f"msg: {exception.message}"
-                )
-                # 重复+1
-                spider.crawler.stats.inc_value(
-                    constants.StatsKey.PARSE_ERROR_DUPLICATED
-                )
-            else:
-                logger.warning(
-                    f"catch a parse error:\n"
-                    f"id: {exception.article_id}\n"
-                    f"msg: {exception.message}"
-                )
-                # 非重复+1
-                spider.crawler.stats.inc_value(
-                    constants.StatsKey.PARSE_ERROR_NON_DUPLICATED
-                )
-                self.exceptions["error"].append(exception)
-                self.articleIds.add(article_id)
+            logger.warning(
+                f"catch a parse error:\n"
+                f"id: {exception.article_id}\n"
+                f"msg: {exception.message}"
+            )
 
             logger.exception(exception)
+
+            if self.json_fp:
+                if self.json_first_write:
+                    self.json_fp.write("[")
+                    self.json_first_write = False
+                else:
+                    self.json_fp.write(",")
+                self.json_fp.write(json.dumps(exception.to_dict(), ensure_ascii=False, indent=4))
+
             return []
 
     def __del__(self):

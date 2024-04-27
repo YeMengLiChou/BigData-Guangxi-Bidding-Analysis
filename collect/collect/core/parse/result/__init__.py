@@ -6,7 +6,7 @@ from collect.collect.core import error
 from collect.collect.core.parse import common, errorhandle
 from collect.collect.core.parse.result import not_win, win
 from collect.collect.middlewares import ParseError
-from constant import constants
+from constants import ProjectKey, PartKey
 from utils import debug_stats as stats
 
 try:
@@ -70,6 +70,7 @@ def parse_response_data(data: list):
     result = []
     for idx in range(len(data) - 1, -1, -1):
         item = data[idx]
+
         announcement_type = check_useful_announcement(item["pathName"])
         if announcement_type == __ANNOUNCEMENT_TYPE_UNUSEFUL:
             continue
@@ -82,25 +83,29 @@ def parse_response_data(data: list):
 
         result_api_meta = {
             # 爬取的时间戳
-            constants.KEY_PROJECT_SCRAPE_TIMESTAMP: item["publishDate"],
+            ProjectKey.SCRAPE_TIMESTAMP: item["publishDate"],
+            # 公告类型
+            ProjectKey.ANNOUNCEMENT_TYPE: item['pathName'],
             # 结果公告的id（可能存在多个）
-            constants.KEY_PROJECT_RESULT_ARTICLE_ID: item["articleId"],
+            ProjectKey.RESULT_ARTICLE_ID: item["articleId"],
             # 发布日期（可能存在多个）
-            constants.KEY_PROJECT_RESULT_PUBLISH_DATE: item["publishDate"],
+            ProjectKey.RESULT_PUBLISH_DATE: item["publishDate"],
             # 公告发布者
-            constants.KEY_PROJECT_AUTHOR: item["author"],
+            ProjectKey.AUTHOR: item["author"],
             # 地区编号（可能为空）
-            constants.KEY_PROJECT_DISTRICT_CODE: item["districtCode"],
+            ProjectKey.DISTRICT_CODE: item["districtCode"],
             # 采购物品名称
-            constants.KEY_PROJECT_CATALOG: item["gpCatalogName"],
+            ProjectKey.CATALOG: item["gpCatalogName"],
             # 采购方式
-            constants.KEY_PROJECT_PROCUREMENT_METHOD: item["procurementMethod"],
+            ProjectKey.PROCUREMENT_METHOD: item["procurementMethod"],
             # 开标时间
-            constants.KEY_PROJECT_BID_OPENING_TIME: item["bidOpeningTime"],
+            ProjectKey.BID_OPENING_TIME: item["bidOpeningTime"],
             # 是否中标
-            constants.KEY_PROJECT_IS_WIN_BID: is_win,
+            ProjectKey.IS_WIN_BID: is_win,
             # 是否为终止公告
-            constants.KEY_PROJECT_IS_TERMINATION: is_termination,
+            ProjectKey.IS_TERMINATION: is_termination,
+            # 终止理由
+            ProjectKey.TERMINATION_REASON: None,
         }
         result.append(result_api_meta)
 
@@ -116,24 +121,24 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
     """
     # 项目编号部分
     if "项目编号" in title:
-        return constants.PartKey.PROJECT_CODE
+        return PartKey.PROJECT_CODE
 
     # 项目编号部分
     if "项目名称" in title:
-        return constants.PartKey.PROJECT_NAME
+        return PartKey.PROJECT_NAME
 
     # 评审部分
     if "评审" in title:
-        return constants.PartKey.REVIEW_EXPERT
+        return PartKey.REVIEW_EXPERT
 
     # 联系方式部分
     if "以下方式联系" in title or "联系方式" in title:
-        return constants.PartKey.CONTACT
+        return PartKey.CONTACT
 
     if is_win:
         # 中标结果部分
         if "中标（成交）信息" in title or "中标信息" in title or "成交信息" in title:
-            return constants.PartKey.WIN_BID
+            return PartKey.WIN_BID
     else:
         # 废标结果部分
         if (
@@ -142,10 +147,10 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
             or ("采购结果" in title)
             or ("结果信息" in title)
         ):
-            return constants.PartKey.NOT_WIN_BID
+            return PartKey.NOT_WIN_BID
         # 终止原因
         if "终止" in title:
-            return constants.PartKey.TERMINATION_REASON
+            return PartKey.TERMINATION_REASON
     return None
 
 
@@ -173,21 +178,17 @@ def parse_html(html_content: str, is_win_bid: bool):
 
     try:
         # 项目编号从 purchase 移动到此处
-        if constants.PartKey.PROJECT_CODE in parts:
-            project_data[constants.KEY_PROJECT_CODE] = "".join(
-                parts[constants.PartKey.PROJECT_CODE]
-            )
+        if PartKey.PROJECT_CODE in parts:
+            project_data[ProjectKey.CODE] = "".join(parts[PartKey.PROJECT_CODE])
         # 项目名称从 purchase 移动到此处
-        if constants.PartKey.PROJECT_NAME in parts:
-            project_data[constants.KEY_PROJECT_NAME] = "".join(
-                parts[constants.PartKey.PROJECT_NAME]
-            )
+        if PartKey.PROJECT_NAME in parts:
+            project_data[ProjectKey.NAME] = "".join(parts[PartKey.PROJECT_NAME])
 
         # 成交公告，中标结果
         if is_win_bid:
             data = win.parse_win_bid(parts)
             # 表示没有标项解析，需要切换
-            if len(data.get(constants.KEY_PROJECT_BID_ITEMS)) == 0:
+            if len(data.get(ProjectKey.BID_ITEMS)) == 0:
                 logger.warning(
                     "该结果公告没有爬取到任何标项信息！尝试切换 other_announcements 进行查找！"
                 )

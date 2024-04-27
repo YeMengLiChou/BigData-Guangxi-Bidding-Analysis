@@ -6,7 +6,7 @@ from collect.collect.core.error import SwitchError
 from collect.collect.middlewares import ParseError
 from utils import symbol_tools
 from utils import debug_stats as stats
-from constant import constants
+from constants import PartKey, ProjectKey, CollectDevKey, BidItemKey
 
 logger = logging.getLogger(__name__)
 
@@ -20,44 +20,42 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
     """
     data = dict()
     # 解析 联系方式
-    if constants.PartKey.CONTACT in parts:
-        data.update(
-            common.parse_contact_info("".join(parts[constants.PartKey.CONTACT]))
-        )
+    if PartKey.CONTACT in parts:
+        data.update(common.parse_contact_info("".join(parts[PartKey.CONTACT])))
     # 解析 评审专家
-    if constants.PartKey.REVIEW_EXPERT in parts:
+    if PartKey.REVIEW_EXPERT in parts:
         data.update(
             NotWinBidStandardFormatParser.parse_review_expert(
-                parts[constants.PartKey.REVIEW_EXPERT]
+                parts[PartKey.REVIEW_EXPERT]
             )
         )
     # 解析 废标理由
-    if constants.PartKey.NOT_WIN_BID in parts:
+    if PartKey.NOT_WIN_BID in parts:
         data.update(
             NotWinBidStandardFormatParser.parse_cancel_reason(
-                "".join(parts[constants.PartKey.NOT_WIN_BID])
+                "".join(parts[PartKey.NOT_WIN_BID])
             )
         )
     # 解析 终止理由
-    if constants.PartKey.TERMINATION_REASON in parts:
+    if PartKey.TERMINATION_REASON in parts:
         # 存在一种情况：标的类型是废标，但是实际上是终止，在这里加上去
-        data[constants.KEY_PROJECT_IS_TERMINATION] = True
+        data[ProjectKey.IS_TERMINATION] = True
         data.update(
             NotWinBidStandardFormatParser.parse_termination_reason(
-                parts[constants.PartKey.TERMINATION_REASON]
+                parts[PartKey.TERMINATION_REASON]
             )
         )
 
     # 如果没有对应的数据，那么就赋值默认值
-    if not data.get(constants.KEY_PROJECT_REVIEW_EXPERT, None):
-        data[constants.KEY_PROJECT_REVIEW_EXPERT] = []
-        data[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = []
+    if not data.get(ProjectKey.REVIEW_EXPERT, None):
+        data[ProjectKey.REVIEW_EXPERT] = []
+        data[ProjectKey.PURCHASE_REPRESENTATIVE] = []
 
     # 如果不是结果公告 或者 没有对应的数据，那么赋默认值
-    if (not data.get(constants.KEY_PROJECT_IS_TERMINATION, False)) or (
-        not data.get(constants.KEY_PROJECT_TERMINATION_REASON, None)
+    if (not data.get(ProjectKey.IS_TERMINATION, False)) or (
+        not data.get(ProjectKey.TERMINATION_REASON, None)
     ):
-        data[constants.KEY_PROJECT_TERMINATION_REASON] = None
+        data[ProjectKey.TERMINATION_REASON] = None
 
     return data
 
@@ -112,7 +110,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         """
         data = dict()
         bid_items = []
-        data[constants.KEY_PROJECT_BID_ITEMS] = bid_items
+        data[ProjectKey.BID_ITEMS] = bid_items
 
         string = symbol_tools.remove_all_spaces(string)
 
@@ -194,7 +192,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                     bid_item = common.get_template_bid_item(
                         index=int(index), is_win=False
                     )
-                    bid_item[constants.KEY_BID_ITEM_REASON] = reason
+                    bid_item[BidItemKey.REASON] = reason
                     bid_items.append(bid_item)
                 # 第三种情况，出现多个标项
                 elif isinstance(index, list):
@@ -206,15 +204,15 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                             idx = pre + 1
                         pre = idx
                         bid_item = common.get_template_bid_item(index=idx, is_win=False)
-                        bid_item[constants.KEY_BID_ITEM_REASON] = reason
+                        bid_item[BidItemKey.REASON] = reason
                         bid_items.append(bid_item)
 
         # 共用一个标项
         else:
             logger.debug(f"废标理由共用：`{string}`")
-            data[constants.KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE] = True
+            data[CollectDevKey.BIDDING_CANCEL_REASON_ONLY_ONE] = True
             item = common.get_template_bid_item(index=1, is_win=False)
-            item[constants.KEY_BID_ITEM_REASON] = string
+            item[BidItemKey.REASON] = string
             bid_items.append(item)
 
         if len(bid_items) == 0:
@@ -232,4 +230,4 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         """
         if len(part) > 2:
             raise ParseError(f"终止理由存在额外内容:", content=part)
-        return {constants.KEY_PROJECT_TERMINATION_REASON: part[-1]}
+        return {ProjectKey.TERMINATION_REASON: part[-1]}

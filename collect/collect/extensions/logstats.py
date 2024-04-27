@@ -5,7 +5,8 @@ from scrapy import signals
 from scrapy.exceptions import NotConfigured
 from scrapy.statscollectors import StatsCollector
 from twisted.internet import task
-from constant import constants
+
+from constants import StatsKey
 from utils import redis_tools
 
 logger = logging.getLogger(__name__)
@@ -43,30 +44,41 @@ class LogStats:
         # 已经成功处理的公告数量
         process_announcement_count = redis_tools.count_article_ids()
         process_item_count = self.stats.get_value(
-            constants.StatsKey.REDIS_UPDATE_PROCESS_ITEM_COUNT, 0
+            StatsKey.REDIS_UPDATE_PROCESS_ITEM_COUNT, 0
         )
 
         # 异常数量
         parse_error_count = self.stats.get_value(
-            constants.StatsKey.PARSE_ERROR_TOTAL, 0
+            StatsKey.PARSE_ERROR_TOTAL, 0
         )
         # kafka发送数量：
         send_item_count = self.stats.get_value(
-            constants.StatsKey.COLLECT_KAFKA_SEND_COUNT, 0
+            StatsKey.COLLECT_KAFKA_SEND_COUNT, 0
         )
         failed_item_count = self.stats.get_value(
-            constants.StatsKey.COLLECT_KAFKA_SEND_FAILED_COUNT, 0
+            StatsKey.COLLECT_KAFKA_SEND_FAILED_COUNT, 0
         )
         # 公告过滤数量
-        filtered_count = self.stats.get_value(constants.StatsKey.FILTERED_COUNT, 0)
+        filtered_count = self.stats.get_value(StatsKey.FILTERED_COUNT, 0)
         # 计划爬取数量
         planned_crawl_count = self.stats.get_value(
-            constants.StatsKey.SPIDER_PLANNED_CRAWL_COUNT, 0
+            StatsKey.SPIDER_PLANNED_CRAWL_COUNT, 0
         )
         actual_crawl_count = self.stats.get_value(
-            constants.StatsKey.SPIDER_ACTUAL_CRAWL_COUNT, 0
+            StatsKey.SPIDER_ACTUAL_CRAWL_COUNT, 0
         )
         residual_crawl_count = planned_crawl_count - actual_crawl_count
+
+        redis_items_count = redis_tools.count_all_items()
+
+        cnt = 0
+        item_count_string = ""
+        for k, v in redis_items_count.items():
+            item_count_string += f"{k}: {int(v):4d}, "
+            cnt += 1
+            if cnt % 4 == 0:
+                item_count_string += "\n"
+
         msg = (
             "Crawled info:\n"
             "redis(%(latest_timestamp)s): { ids: %(process_announcement_count)d, items: %("
@@ -74,7 +86,8 @@ class LogStats:
             "kafka: { sent: %(send_item_count)d, failed: %(failed_item_count)d }\n"
             "error: { parse_error: %(parse_error_count)d }\n"
             "current: { filter: %(filtered_count)d, actual: %(actual_crawl_count)d, remain: %("
-            "residual_crawl_count)d }"
+            "residual_crawl_count)d }\n"
+            "items: \n %(item_count_string)s"
         )
         log_args = {
             "latest_timestamp": latest_timestamp,
@@ -86,6 +99,7 @@ class LogStats:
             "filtered_count": filtered_count,
             "actual_crawl_count": actual_crawl_count,
             "residual_crawl_count": residual_crawl_count,
+            "item_count_string": item_count_string
         }
         logger.info(msg, log_args, extra={"spider": spider})
 
