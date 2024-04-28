@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import *
 from pyspark.sql.streaming import StreamingQuery, DataStreamReader
+from pyspark.sql import DataFrameReader
 
 
 class SparkUtils:
@@ -39,8 +40,29 @@ class SparkUtils:
         :return 返回对应的 ``DataStreamReader``
         """
         topic = ".".join(topics)
+        kafka_options = {
+            "kafka.bootstrap.servers": kafka_server,
+            "subscribe": topic,
+            "startingOffsets": "earliest",
+            "endingOffsets": "latest",
+        }
+        return session.readStream.format("kafka").options(**kafka_options)
+
+    @staticmethod
+    def get_kafka_source(
+        session: SparkSession, kafka_server: str, topics: list[str]
+    ) -> DataFrameReader:
+        """
+        获取 kafka 的数据源，不是 Streaming
+
+        :param session
+        :param kafka_server
+        :param topics
+        :return 返回对应的 ``DataStreamReader``
+        """
+        topic = ".".join(topics)
         return (
-            session.readStream.format("kafka")
+            session.read.format("kafka")
             .option("kafka.bootstrap.servers", kafka_server)
             .option("subscribe", topic)
             .option("startingOffsets", "earliest")
