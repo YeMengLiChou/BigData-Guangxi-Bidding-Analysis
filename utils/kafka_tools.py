@@ -63,6 +63,7 @@ def _init_producer():
         key_serializer=lambda x: x.encode("utf-8") if x else x,
         retries=3,
         compression_type="gzip",
+        max_request_size=1024 * 1024 * 100,
     )
 
 

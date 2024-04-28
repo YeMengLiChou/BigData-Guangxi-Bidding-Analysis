@@ -7,7 +7,13 @@ from lxml import etree
 from collect.collect.middlewares import ParseError
 from utils import symbol_tools as sym
 from utils import debug_stats as stats
-from constant import constants
+from constants import (
+    ProjectKey,
+    AnnouncementType,
+    BidItemKey,
+    CollectConstants,
+    CollectDevKey,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -213,9 +219,9 @@ def check_win_bid_announcement(announcement_type: int) -> bool:
     :return:
     """
     return announcement_type in [
-        constants.ANNOUNCEMENT_TYPE_WIN,
-        constants.ANNOUNCEMENT_TYPE_DEAL,
-        constants.ANNOUNCEMENT_TYPE_WIN_AND_DEAL,
+        AnnouncementType.WIN,
+        AnnouncementType.DEAL,
+        AnnouncementType.WIN_AND_DEAL,
     ]
 
 
@@ -225,7 +231,7 @@ def check_termination_announcement(announcement_type: int) -> bool:
     :param announcement_type:
     :return:
     """
-    return announcement_type == constants.ANNOUNCEMENT_TYPE_TERMINATION
+    return announcement_type == AnnouncementType.TERMINATION
 
 
 def check_not_win_bid_announcement(announcement_type: int) -> bool:
@@ -234,7 +240,7 @@ def check_not_win_bid_announcement(announcement_type: int) -> bool:
     :param announcement_type:
     :return:
     """
-    return announcement_type == constants.ANNOUNCEMENT_TYPE_NOT_WIN
+    return announcement_type == AnnouncementType.NOT_WIN
 
 
 def check_unuseful_announcement(announcement_type: int) -> bool:
@@ -244,11 +250,11 @@ def check_unuseful_announcement(announcement_type: int) -> bool:
     :return:
     """
     return announcement_type not in [
-        constants.ANNOUNCEMENT_TYPE_NOT_WIN,  # 废标
-        constants.ANNOUNCEMENT_TYPE_WIN,  # 中标
-        constants.ANNOUNCEMENT_TYPE_DEAL,  # 成交
-        constants.ANNOUNCEMENT_TYPE_WIN_AND_DEAL,  # 中标（成交）
-        constants.ANNOUNCEMENT_TYPE_TERMINATION,  # 终止公告
+        AnnouncementType.NOT_WIN,  # 废标
+        AnnouncementType.WIN,  # 中标
+        AnnouncementType.DEAL,  # 成交
+        AnnouncementType.WIN_AND_DEAL,  # 中标（成交）
+        AnnouncementType.TERMINATION,  # 终止公告
     ]
 
 
@@ -263,8 +269,8 @@ def parse_review_experts(part: list[str]) -> dict:
     """
     通用的 “评审小组” 部分解析
     :param part:
-    :return: 返回包含 ``constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE``
-                和 ``constants.KEY_PROJECT_REVIEW_EXPERT`` 的dict（不为空）
+    :return: 返回包含 ``ProjectKey.PURCHASE_REPRESENTATIVE``
+                和 ``ProjectKey.REVIEW_EXPERT`` 的dict（不为空）
     """
     data = dict()
     counter = {}
@@ -277,10 +283,10 @@ def parse_review_experts(part: list[str]) -> dict:
 
     # 评审小组
     review_experts = []
-    data[constants.KEY_PROJECT_REVIEW_EXPERT] = review_experts
+    data[ProjectKey.REVIEW_EXPERT] = review_experts
     # 采购代表人
     representatives = []
-    data[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = representatives
+    data[ProjectKey.PURCHASE_REPRESENTATIVE] = representatives
 
     # 存在分隔符
     if len(counter) != 0:
@@ -343,27 +349,27 @@ def get_template_bid_item(is_win: bool, index: int, name: str = None) -> dict:
     """
     return {
         # 名称
-        constants.KEY_BID_ITEM_NAME: name,
+        BidItemKey.NAME: name,
         # 序号
-        constants.KEY_BID_ITEM_INDEX: index,
+        BidItemKey.INDEX: index,
         # 是否中标
-        constants.KEY_BID_ITEM_IS_WIN: is_win,
+        BidItemKey.IS_WIN: is_win,
         # 预算
-        constants.KEY_BID_ITEM_BUDGET: constants.BID_ITEM_BUDGET_UNASSIGNED,
+        BidItemKey.BUDGET: CollectConstants.BID_ITEM_BUDGET_UNASSIGNED,
         # 中标金额
-        constants.KEY_BID_ITEM_AMOUNT: (
-            constants.BID_ITEM_AMOUNT_UNASSIGNED
+        BidItemKey.AMOUNT: (
+            CollectConstants.BID_ITEM_AMOUNT_UNASSIGNED
             if is_win
-            else constants.BID_ITEM_AMOUNT_NOT_DEAL
+            else CollectConstants.BID_ITEM_AMOUNT_NOT_DEAL
         ),
         # 中标金额是否为百分比
-        constants.KEY_BID_ITEM_IS_PERCENT: False,
+        BidItemKey.IS_PERCENT: False,
         # 供应商
-        constants.KEY_BID_ITEM_SUPPLIER: None,
+        BidItemKey.SUPPLIER: None,
         # 供应商地址
-        constants.KEY_BID_ITEM_SUPPLIER_ADDRESS: None,
+        BidItemKey.SUPPLIER_ADDRESS: None,
         # 废标原因
-        constants.KEY_BID_ITEM_REASON: None,
+        BidItemKey.REASON: None,
     }
 
 
@@ -388,27 +394,24 @@ def parse_contact_info(part: str) -> dict:
 
     data = dict()
     if match := PATTERN_PURCHASER.search(part):
-        data[constants.KEY_PURCHASER] = match.group(1)
+        data[ProjectKey.PURCHASER] = match.group(1)
     else:
-        data[constants.KEY_PURCHASER] = None
+        data[ProjectKey.PURCHASER] = None
 
     if match := PATTERN_PURCHASER_AGENCY.search(part):
-        data[constants.KEY_PURCHASER_AGENCY] = match.group(1)
+        data[ProjectKey.PURCHASER_AGENCY] = match.group(1)
     else:
-        data[constants.KEY_PURCHASER_AGENCY] = None
+        data[ProjectKey.PURCHASER_AGENCY] = None
 
-    if (
-        data[constants.KEY_PURCHASER] is None
-        or data[constants.KEY_PURCHASER_AGENCY] is None
-    ):
+    if data[ProjectKey.PURCHASER] is None or data[ProjectKey.PURCHASER_AGENCY] is None:
         # 某些只有一个名称
         if part.count("名称") == 1:
             return data
         raise ParseError(
             msg="出现新的联系方式内容",
             content=[
-                f"purchaser 解析结果:{data[constants.KEY_PURCHASER]}",
-                f"agency 解析结果:{data[constants.KEY_PURCHASER_AGENCY]}",
+                f"purchaser 解析结果:{data[ProjectKey.PURCHASER]}",
+                f"agency 解析结果:{data[ProjectKey.PURCHASER_AGENCY]}",
                 part,
             ],
         )
@@ -426,15 +429,12 @@ def _merge_bid_items(
     :param _result:
     :return:
     """
-    # TODO: 可能部分标项信息的index不一致，需要其他方法来进行实现
-    _purchase.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
-    _result.sort(key=lambda x: x[constants.KEY_BID_ITEM_INDEX])
+    _purchase.sort(key=lambda x: x[BidItemKey.INDEX])
+    _result.sort(key=lambda x: x[BidItemKey.INDEX])
     # 仅有一个废标理由，所有标项共用
     if cancel_reason_only_one:
         for i in range(len(_purchase)):
-            _purchase[i][constants.KEY_BID_ITEM_REASON] = _result[0][
-                constants.KEY_BID_ITEM_REASON
-            ]
+            _purchase[i][BidItemKey.REASON] = _result[0][BidItemKey.REASON]
         return _purchase
 
     n = len(_purchase)
@@ -442,12 +442,10 @@ def _merge_bid_items(
         m = 0
     else:
         # 存在多个供应商分一个标项
-        m = max(_result, key=lambda x: x[constants.KEY_BID_ITEM_INDEX])[
-            constants.KEY_BID_ITEM_INDEX
-        ]
+        m = max(_result, key=lambda x: x[BidItemKey.INDEX])[BidItemKey.INDEX]
     if n != m:
         # 候选人公告导致的标项不一致，TODO：到时候特判处理一下
-        if constants.KEY_DEV_RESULT_CONTAINS_CANDIDATE in data:
+        if CollectDevKey.RESULT_CONTAINS_CANDIDATE in data:
             raise ParseError(
                 msg="标项数量不一致，存在候选人公告！",
                 content=[
@@ -465,22 +463,15 @@ def _merge_bid_items(
     r_idx = 0
     for p_idx in range(n):
         purchase_item = _purchase[p_idx]
-        purchase_index = purchase_item[constants.KEY_BID_ITEM_INDEX]
+        purchase_index = purchase_item[BidItemKey.INDEX]
 
         # 同一个标项 purchase_item 可能有多个 result_item 对应
-        while (
-            r_idx < result_len
-            and _result[r_idx][constants.KEY_BID_ITEM_INDEX] == purchase_index
-        ):
+        while r_idx < result_len and _result[r_idx][BidItemKey.INDEX] == purchase_index:
             result_item = _result[r_idx]
             # 标项名称
-            result_item[constants.KEY_BID_ITEM_NAME] = purchase_item[
-                constants.KEY_BID_ITEM_NAME
-            ]
+            result_item[BidItemKey.NAME] = purchase_item[BidItemKey.NAME]
             # 标项预算
-            result_item[constants.KEY_BID_ITEM_BUDGET] = purchase_item[
-                constants.KEY_BID_ITEM_BUDGET
-            ]
+            result_item[BidItemKey.BUDGET] = purchase_item[BidItemKey.BUDGET]
             r_idx += 1
 
     return _result
@@ -496,10 +487,10 @@ def calculate_total_amount(bid_items: list, budget: float):
     """
     total_amount = 0
     for item in bid_items:
-        if item[constants.KEY_BID_ITEM_IS_WIN]:
-            amount = item[constants.KEY_BID_ITEM_AMOUNT]
+        if item[BidItemKey.IS_WIN]:
+            amount = item[BidItemKey.AMOUNT]
             # 百分比计算，需要和项目的总预算计算
-            if item[constants.KEY_BID_ITEM_IS_PERCENT]:
+            if item[BidItemKey.IS_PERCENT]:
                 amount = amount * 0.01
                 total_amount += budget * amount
             else:
@@ -518,150 +509,84 @@ def calculate_total_budget(bid_items: list):
     total_budget = 0
     bid_item_index = 0
     for item in bid_items:
-        if item[constants.KEY_BID_ITEM_INDEX] != bid_item_index:
-            bid_item_index = item[constants.KEY_BID_ITEM_INDEX]
-            total_budget += item[constants.KEY_BID_ITEM_BUDGET]
+        if item[BidItemKey.INDEX] != bid_item_index:
+            bid_item_index = item[BidItemKey.INDEX]
+            total_budget += item[BidItemKey.BUDGET]
     return total_budget
 
 
+# ProjectKey
+keys = []
+# 排除的key，需要单独设置
+exclude_keys = [ProjectKey.TOTAL_BUDGET, ProjectKey.TOTAL_AMOUNT]
+for _k, v in vars(ProjectKey).items():
+    if _k.isupper() and v not in exclude_keys:
+        keys.append(v)
+
+
 @stats.function_stats(logger)
-def make_item(data: dict, purchase_data: Union[dict, None]):
+def make_item(result_data: dict, purchase_data: Union[dict, None]):
     """
     将 data 所需要的内容提取出来
     :param purchase_data:
-    :param data:
+    :param result_data:
     :return:
     """
     # 存在 采购数据, 也就是存在标项，
     if purchase_data:
         # 终止公告
-        if data.get(constants.KEY_PROJECT_IS_TERMINATION, False):
+        if result_data.get(ProjectKey.IS_TERMINATION, False):
             # 直接用 purchase 的 标项
-            data[constants.KEY_PROJECT_BID_ITEMS] = purchase_data.pop(
-                constants.KEY_PROJECT_BID_ITEMS, []
+            result_data[ProjectKey.BID_ITEMS] = purchase_data.pop(
+                ProjectKey.BID_ITEMS, []
             )
         else:
             # 合并标项
-            purchase_bid_items = purchase_data.pop(constants.KEY_PROJECT_BID_ITEMS, [])
-            result_bid_items = data.get(constants.KEY_PROJECT_BID_ITEMS, [])
-            data[constants.KEY_PROJECT_BID_ITEMS] = _merge_bid_items(
+            purchase_bid_items = purchase_data.pop(ProjectKey.BID_ITEMS, [])
+            result_bid_items = result_data.get(ProjectKey.BID_ITEMS, [])
+            result_data[ProjectKey.BID_ITEMS] = _merge_bid_items(
                 _purchase=purchase_bid_items,
                 _result=result_bid_items,
-                cancel_reason_only_one=data.get(
-                    constants.KEY_DEV_BIDDING_CANCEL_REASON_ONLY_ONE, False
+                cancel_reason_only_one=result_data.get(
+                    CollectDevKey.BIDDING_CANCEL_REASON_ONLY_ONE, False
                 ),
-                data=data,
+                data=result_data,
             )
-        data.update(purchase_data)
+        result_data.update(purchase_data)
 
     # 从 data 中取出所需要的信息
-    item = dict()
-    # 爬取的时间
-    item[constants.KEY_PROJECT_SCRAPE_TIMESTAMP] = data[
-        constants.KEY_PROJECT_SCRAPE_TIMESTAMP
-    ]
-    # 项目名称
-    item[constants.KEY_PROJECT_NAME] = data.get(constants.KEY_PROJECT_NAME, None)
-    # 项目编号
-    item[constants.KEY_PROJECT_CODE] = data.get(constants.KEY_PROJECT_CODE, None)
-    # 地区编号
-    item[constants.KEY_PROJECT_DISTRICT_CODE] = data.get(
-        constants.KEY_PROJECT_DISTRICT_CODE, None
-    )
+    item = {k: result_data[k] for k in keys}
+
     # TODO： 设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
-    if not item[constants.KEY_PROJECT_DISTRICT_CODE]:
+    if not item[ProjectKey.DISTRICT_CODE]:
         raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))
 
-    item[constants.KEY_PROJECT_AUTHOR] = data.get(constants.KEY_PROJECT_AUTHOR, None)
-    # 采购种类
-    item[constants.KEY_PROJECT_CATALOG] = data.get(constants.KEY_PROJECT_CATALOG, None)
-    # 采购方式
-    item[constants.KEY_PROJECT_PROCUREMENT_METHOD] = data.get(
-        constants.KEY_PROJECT_PROCUREMENT_METHOD, None
-    )
-    # 开标时间
-    item[constants.KEY_PROJECT_BID_OPENING_TIME] = data.get(
-        constants.KEY_PROJECT_BID_OPENING_TIME, None
-    )
-    # 是否成交：中标/废标
-    item[constants.KEY_PROJECT_IS_WIN_BID] = data.get(
-        constants.KEY_PROJECT_IS_WIN_BID, None
-    )
-    # 结果公告 ids
-    item[constants.KEY_PROJECT_RESULT_ARTICLE_ID] = data.get(
-        constants.KEY_PROJECT_RESULT_ARTICLE_ID, []
-    )
-    # 结果公告的日期
-    item[constants.KEY_PROJECT_RESULT_PUBLISH_DATE] = data.get(
-        constants.KEY_PROJECT_RESULT_PUBLISH_DATE, []
-    )
-
-    # 采购公告ids
-    item[constants.KEY_PROJECT_PURCHASE_ARTICLE_ID] = data.get(
-        constants.KEY_PROJECT_PURCHASE_ARTICLE_ID, []
-    )
-    # 采购公告的日期
-    item[constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE] = data.get(
-        constants.KEY_PROJECT_PURCHASE_PUBLISH_DATE, []
-    )
-
     # 项目总预算
-    total_budget = data.get(constants.KEY_PROJECT_TOTAL_BUDGET, None)
+    total_budget = result_data.get(ProjectKey.TOTAL_BUDGET, None)
     calculated_budget = calculate_total_budget(
-        bid_items=data[constants.KEY_PROJECT_BID_ITEMS]
+        bid_items=result_data[ProjectKey.BID_ITEMS]
     )
     # 如果项目总预算存在，则需要和计算后的预算进行对比
     if total_budget:
         if abs(calculated_budget - total_budget) > 1e-5:
             raise ParseError(
                 msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致（误差大于1e-5）",
-                content=data[constants.KEY_PROJECT_BID_ITEMS],
+                content=result_data[ProjectKey.BID_ITEMS],
             )
         else:
-            item[constants.KEY_PROJECT_TOTAL_BUDGET] = calculated_budget
+            item[ProjectKey.TOTAL_BUDGET] = calculated_budget
     else:
-        item[constants.KEY_PROJECT_TOTAL_BUDGET] = calculated_budget
+        item[ProjectKey.TOTAL_BUDGET] = calculated_budget
 
-    # 项目的标项
-    item[constants.KEY_PROJECT_BID_ITEMS] = data.get(
-        constants.KEY_PROJECT_BID_ITEMS, None
-    )
     # 计算总金额
-    if item[constants.KEY_PROJECT_IS_WIN_BID]:
-        item[constants.KEY_PROJECT_TOTAL_AMOUNT] = calculate_total_amount(
-            bid_items=item[constants.KEY_PROJECT_BID_ITEMS],
-            budget=item[constants.KEY_PROJECT_TOTAL_BUDGET],
+    if item[ProjectKey.IS_WIN_BID]:
+        item[ProjectKey.TOTAL_AMOUNT] = calculate_total_amount(
+            bid_items=item[ProjectKey.BID_ITEMS],
+            budget=item[ProjectKey.TOTAL_BUDGET],
         )
     else:
-        item[constants.KEY_PROJECT_TOTAL_AMOUNT] = 0
+        item[ProjectKey.TOTAL_AMOUNT] = 0
 
-    # 总时长
-    item[constants.KEY_PROJECT_TENDER_DURATION] = data.get(
-        constants.KEY_PROJECT_TENDER_DURATION, 0
-    )
-
-    # 采购方信息
-    item[constants.KEY_PURCHASER] = data.get(constants.KEY_PURCHASER, None)
-    # 采购方机构信息
-    item[constants.KEY_PURCHASER_AGENCY] = data.get(
-        constants.KEY_PURCHASER_AGENCY, None
-    )
-    # 审查专家信息
-    item[constants.KEY_PROJECT_REVIEW_EXPERT] = data.get(
-        constants.KEY_PROJECT_REVIEW_EXPERT, []
-    )
-    # 采购代表人信息
-    item[constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE] = data.get(
-        constants.KEY_PROJECT_PURCHASE_REPRESENTATIVE, []
-    )
-    # 是否终止
-    item[constants.KEY_PROJECT_IS_TERMINATION] = data.get(
-        constants.KEY_PROJECT_IS_TERMINATION, None
-    )
-    # 终止理由
-    item[constants.KEY_PROJECT_TERMINATION_REASON] = data.get(
-        constants.KEY_PROJECT_TERMINATION_REASON, None
-    )
     return item
 
 

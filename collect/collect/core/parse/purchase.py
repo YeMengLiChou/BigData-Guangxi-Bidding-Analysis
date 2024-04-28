@@ -7,8 +7,8 @@ from collect.collect.core.error import SwitchError
 from collect.collect.core.parse import common, AbstractFormatParser
 from collect.collect.core.parse.errorhandle import raise_error
 from collect.collect.middlewares import ParseError
+from constants import ProjectKey, BidItemKey, PartKey
 from utils import debug_stats as stats, symbol_tools
-from constant import constants
 
 logger = logging.getLogger(__name__)
 
@@ -45,18 +45,17 @@ class StandardFormatParser(AbstractFormatParser):
 
         data = dict()
         bidding_items = []
-        data[constants.KEY_PROJECT_BID_ITEMS] = bidding_items
+        data[ProjectKey.BID_ITEMS] = bidding_items
 
-        total_budget: Union[float, None] = None
         # 正则表达式匹配基本信息
         if match := StandardFormatParser.PATTERN_PROJECT_INFO.search(prefix):
             # 项目编号
-            data[constants.KEY_PROJECT_CODE] = match.group(1)
+            data[ProjectKey.CODE] = match.group(1)
             # 项目名称
-            data[constants.KEY_PROJECT_NAME] = match.group(2)
+            data[ProjectKey.NAME] = match.group(2)
             # 总预算
             total_budget = float(match.group(3))
-            data[constants.KEY_PROJECT_TOTAL_BUDGET] = total_budget
+            data[ProjectKey.TOTAL_BUDGET] = total_budget
             for d in match.groups():
                 if d is None:
                     raise ParseError(
@@ -64,6 +63,9 @@ class StandardFormatParser(AbstractFormatParser):
                     )
         else:
             raise ParseError(msg="基本情况解析失败：匹配失败", content=[string])
+
+        if total_budget is None:
+            raise ParseError(msg="基本情况解析失败：无总预算", content=[string])
 
         if match := StandardFormatParser.PATTERN_BIDDING.findall(suffix):
             if len(match) == 0:
@@ -89,7 +91,7 @@ class StandardFormatParser(AbstractFormatParser):
                 item = common.get_template_bid_item(
                     is_win=False, index=index, name=name
                 )
-                item[constants.KEY_BID_ITEM_BUDGET] = float(budget)
+                item[BidItemKey.BUDGET] = float(budget)
                 bidding_items.append(item)
 
                 item_index += 1
@@ -116,7 +118,7 @@ def check_useful_part(_: bool, title: str) -> Union[int, None]:
     :return:
     """
     if "项目基本情况" in title:
-        return constants.PartKey.PROJECT_SITUATION
+        return PartKey.PROJECT_SITUATION
     return None
 
 
@@ -144,7 +146,7 @@ def parse_html(html_content: str):
             res = _parse(parts)
 
             # 没有标项信息则切换
-            if len(res.get(constants.KEY_PROJECT_BID_ITEMS, [])) == 0:
+            if len(res.get(ProjectKey.BID_ITEMS, [])) == 0:
                 raise SwitchError("该采购公告没有标项信息")
 
             return res
@@ -173,10 +175,10 @@ def _parse(parts: dict[int, list[str]]):
 
     data = dict()
     # 项目基本情况
-    if constants.PartKey.PROJECT_SITUATION in parts:
+    if PartKey.PROJECT_SITUATION in parts:
         data.update(
             StandardFormatParser.parse_project_base_situation(
-                "".join(parts[constants.PartKey.PROJECT_SITUATION])
+                "".join(parts[PartKey.PROJECT_SITUATION])
             )
         )
 

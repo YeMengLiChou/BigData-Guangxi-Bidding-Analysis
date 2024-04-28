@@ -34,12 +34,7 @@ KEY_ANNOUNCEMENT_ARTICLE_IDS = "bidding:announcement:article_ids"
 已经爬取过的所有公告结果
 """
 
-KEY_PARSE_ERROR_AMOUNT = "bidding:error:amount"
-"""
-金额解析错误
-"""
-
-# KEY_PARSE_ERROR_
+KEY_ITEMS_COUNT = "bidding:items:count"
 
 # ======================== TOOLS FUNCTIONS ========================= #
 
@@ -155,8 +150,31 @@ def delete_all_article_ids():
     _client.delete(KEY_ANNOUNCEMENT_ARTICLE_IDS)
 
 
-if __name__ == "__main__":
-    # print(_client.smembers(KEY_ANNOUNCEMENT_ARTICLE_IDS))
-    res = add_unique_article_ids([])
-    print(res)
+# ===================== items =============================================
 
+
+def increment_items_amount(item_time: str) -> bool:
+    """
+    增加一个爬取的 item 数量
+    :param item_time: 爬取的时间，格式为 YY-MM
+    :return: 是否增加成功
+    """
+    return _client.hincrby(KEY_ITEMS_COUNT, item_time, 1) == 1
+
+
+def count_all_items():
+    """
+    获取所有爬取的 item 数量
+    :return: 所有爬取的 item 数量
+    """
+    return _client.hgetall(KEY_ITEMS_COUNT)
+
+
+def clear_cached_data():
+    _client.delete(KEY_ANNOUNCEMENT_ARTICLE_IDS)
+    _client.delete(KEY_ITEMS_COUNT)
+    _client.delete(KEY_ANNOUNCEMENT_LATEST_TIMESTAMP)
+
+
+if __name__ == "__main__":
+    clear_cached_data()

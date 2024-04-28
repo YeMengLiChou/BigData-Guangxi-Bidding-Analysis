@@ -17,7 +17,7 @@ CONCURRENT_REQUESTS = 16
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 0
+DOWNLOAD_DELAY = 0.5
 
 # 下载超时30
 DOWNLOAD_TIMEOUT = 30
@@ -76,9 +76,9 @@ EXTENSIONS = {"collect.extensions.LogStats": 300}
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    "collect.pipelines.CollectKafkaPipeline": 300,
-    "collect.pipelines.UpdateRedisInfoPipeline": 200,
-    "collect.pipelines.DebugPipeline": 200,
+    "collect.pipelines.UpdateRedisInfoPipeline": 200,  # redis 更新 item 的数据
+    "collect.pipelines.DebugPipeline": 200,  # debug，写入本地
+    "collect.pipelines.CollectKafkaPipeline": 300,  # 发送到 kafka
     # "collect.pipelines.DebugWritePipeline": 100,
 }
 
@@ -109,10 +109,23 @@ TWISTED_REACTOR = "twisted.internet.asyncioreactor.AsyncioSelectorReactor"
 FEED_EXPORT_ENCODING = "utf-8"
 
 LOG_LEVEL = logging.INFO
-LOG_FILE="logs/out.log"
 
-# 内存调试，显示内存使用情况
-MEMDEBUG_ENABLED = True
+LOG_FILE = "logs/out.log"
+
+# size / time
+LOG_FILE_TYPE = "time"
+
+# 最大保留个数
+LOG_FILE_BACKUP_COUNT = 50
+
+# 最大文件大小，当 ``LOG_FILE_TYPE`` 设置为 size 生效
+# LOG_FILE_MAX_BYTES = 5 * 1024 * 1024
+
+# 生成文件间隔，单位为 ``LOG_FILE_ROTATION``，当 ``LOG_FILE_TYPE`` 设置为 time 生效
+LOG_FILE_INTERVAL = 15
+
+# 日志文件生成间隔单位：second / minute / hour / day /
+LOG_FILE_ROTATION_UNIT = "minute"
 
 # ======== ResponseDebugMiddleware =================
 # 是否设置 ResponseDebugMiddleware 的调试

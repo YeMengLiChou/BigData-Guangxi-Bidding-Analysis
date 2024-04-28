@@ -3,7 +3,7 @@ from typing import IO, Union
 from scrapy import Spider, signals
 from scrapy.crawler import Crawler
 
-import constant.constants
+from constants import CollectDevKey
 
 
 class DebugWritePipeline:
@@ -27,8 +27,8 @@ class DebugWritePipeline:
         self.fp = open("logs/base_info_test_cases.txt", mode="a", encoding="utf-8")
 
     def process_item(self, item, spider: Spider):
-        if constant.constants.KEY_DEV_DEBUG_WRITE in item:
-            self.fp.write(f"{item[constant.constants.KEY_TEMP_BASE_INFO]}\n")
+        if CollectDevKey.DEBUG_WRITE in item:
+            self.fp.write(f"{item[CollectDevKey.TEMP_BASE_INFO]}\n")
             self.fp.flush()
             return None
         return item

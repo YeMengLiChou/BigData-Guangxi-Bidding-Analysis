@@ -1,11 +1,31 @@
 import importlib
 import logging
 import sys
+from logging.handlers import RotatingFileHandler
 
 import coloredlogs
+import scrapy
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 from scrapy.utils import log
+
+from utils.handlers import HourRotationFileHandler
+
+
+class LevelFilter(logging.Filter):
+    """
+    设置最低的日志等级
+    """
+    def __init__(self, level: int):
+        logging.Filter.__init__(self)
+        if level not in (logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL):
+            raise ValueError("level must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL")
+        self.level = level
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno >= self.level:
+            return True
+        return False
 
 
 def _get_project_settings(module_path: str) -> Settings:
@@ -58,15 +78,41 @@ def configure_logging(settings: Settings):
     log_dateformat = settings.get("LOG_DATEFORMAT")
 
     level = settings.get("LOG_LEVEL")
-
+    log_type = settings.get("LOG_FILE_TYPE", None)
     # 输出到文件就不需要着色
     if filename:
         file_mode = "a" if settings.getbool("LOG_FILE_APPEND") else "w"  # 日志文件模式
         encoding = settings.get("LOG_ENCODING")  # 日志文件编码
+        backup_count = settings.getint("LOG_FILE_BACKUP_COUNT")
+        # 没有指定
+        if log_type is None:
+            handler = logging.FileHandler(
+                filename=filename, mode=file_mode, encoding=encoding
+            )
 
-        handler = logging.FileHandler(
-            filename=filename, mode=file_mode, encoding=encoding
-        )
+        elif log_type == "time":
+            unit = settings.get("LOG_FILE_ROTATION_UNIT", "hour")
+            interval = settings.getint("LOG_FILE_INTERVAL", 1)
+            handler = HourRotationFileHandler(
+                filename=filename,
+                encoding=encoding,
+                unit=unit,
+                interval=interval,
+                backupCount=backup_count,
+                utc=False,
+
+            )
+        elif log_type == "size":
+            max_bytes = settings.getint("LOG_FILE_MAX_BYTES")
+            handler = RotatingFileHandler(
+                filename=filename,
+                mode=file_mode,
+                encoding=encoding,
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+            )
+        else:
+            raise ValueError("`LOG_FILE_TYPE` must be time、 size or None")
 
         formatter = logging.Formatter(  # 设置日志格式
             fmt=log_format, datefmt=log_dateformat
@@ -75,6 +121,7 @@ def configure_logging(settings: Settings):
         if settings.getbool("LOG_SHORT_NAMES"):  # 是否缩写
             handler.addFilter(log.TopLevelFormatter(["scrapy"]))
 
+        handler.addFilter(LevelFilter(level=logging.INFO))
         logging.basicConfig(
             level=level,
             handlers=[handler],
@@ -120,16 +167,16 @@ def _run_spider(spider_name: str, _settings: Settings):
     crawler_process = CrawlerProcess(_settings, install_root_handler=False)
     crawl_defer = crawler_process.crawl(spider_name)
     if getattr(crawl_defer, "result", None) is not None and issubclass(
-        crawl_defer.result.type, Exception
+            crawl_defer.result.type, Exception
     ):
         exitcode = 1
     else:
         crawler_process.start()
 
         if (
-            crawler_process.bootstrap_failed
-            or hasattr(crawler_process, "has_exception")
-            and crawler_process.has_exception
+                crawler_process.bootstrap_failed
+                or hasattr(crawler_process, "has_exception")
+                and crawler_process.has_exception
         ):
             exitcode = 1
         else:

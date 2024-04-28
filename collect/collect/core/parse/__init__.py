@@ -134,20 +134,20 @@ def parse_amount_and_percent(
             if unit == "%":
                 if not is_percent:
                     raise ParseError(
-                        f"`{string}` 的单位：`{unit}` 不匹配预期的 %", content=[string]
+                        f"金额解析异常: `{string}` 的单位：`{unit}` 不匹配预期的 %", content=[string]
                     )
                 else:
                     return amount, is_percent, True
             elif unit == "元":
                 if is_percent:
                     raise ParseError(
-                        f"`{string}` 的单位：`{unit}` 不匹配预期的 元", content=[string]
+                        f"金额解析异常: `{string}` 的单位：`{unit}` 不匹配预期的 元", content=[string]
                     )
                 else:
                     return amount, is_percent, True
             else:
                 raise ParseError(
-                    f"无法解析 `{string}` 的 单位：{unit}", content=[string]
+                    f"金额解析异常: 无法解析 `{string}` 的 单位：{unit}", content=[string]
                 )
 
     # 匹配类型： [大写金额](¥/￥[小写金额])
@@ -156,7 +156,7 @@ def parse_amount_and_percent(
         return float(amount_text), False, True
 
     if raise_error:
-        raise ParseError(msg=f"无法解析金额：`{string}`", content=[string])
+        raise ParseError(msg=f"金额解析异常: 无法解析金额`{string}`", content=[string])
     else:
         return None, None, True
 
@@ -184,13 +184,13 @@ class AbstractFormatParser:
             strs = [amount_str]
 
         if len(strs) == 0:
-            raise ParseError(f"无法解析金额：{amount_str}", content=[amount_str])
+            raise ParseError(f"金额解析异常: 无法解析：`{amount_str}`", content=[amount_str])
 
         # 仅有一行
         if len(strs) == 1:
             amount, is_percent, _ = parse_amount_and_percent(strs[0])
             if amount is None:
-                raise ParseError(f"无法解析金额：`{amount_str}`", content=[amount_str])
+                raise ParseError(f"金额解析异常: 无法解析 `{amount_str}`", content=[amount_str])
             else:
                 return amount, is_percent
 
@@ -210,7 +210,7 @@ class AbstractFormatParser:
         if counter != 0:
             return counter, False
 
-        raise ParseError(f"无法解析金额：`{amount_str}`", content=strs)
+        raise ParseError(f"金额解析异常: 无法解析 `{amount_str}`", content=strs)
 
     @staticmethod
     def parse_bids_information(part: list[str]) -> list:
