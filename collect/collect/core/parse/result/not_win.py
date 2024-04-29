@@ -62,7 +62,12 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
 
 class NotWinBidStandardFormatParser(AbstractFormatParser):
     PATTERN_BID_ITEM_CHECK = re.compile(
-        r"((\d+)(?:标项|分标|标段|包))|((?:标项|分标|标段|包)(\d+))"
+        r"(((\d+|[A-Z])(?:标项|分标|标段|包))|((?:标项|分标|标段|包)(\d+|[A-Z])))[:：]"
+    )
+
+    # 分标xx至分标xx
+    PATTERN_BID_ITEM_RANGE_CHECK = re.compile(
+        r"(分标|标项|标段|包)\d{1,2}至(分标|标项|标段|包)\d{1,2}"
     )
 
     # 数字序号(在文字前面）
@@ -76,7 +81,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
     )
 
     # 字母序号"
-    PATTERN_BID_ITEM_CHARACTER_INDEX = re.compile(r"([A-Z])(?:分标|标项)[:：]?(.*)")
+    PATTERN_BID_ITEM_CHARACTER_INDEX = re.compile(r"([A-Z])(?:分标|标项)[:：]?(\S*)")
 
     # 合并在一起的标项
     # 本项目1、2分标投标文件提交截止时间后提交投标文件的供应商不足三家，本项目废标
@@ -115,8 +120,18 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
         string = symbol_tools.remove_all_spaces(string)
 
         # 存在标项说明，需要检查
-        if NotWinBidStandardFormatParser.PATTERN_BID_ITEM_CHECK.search(string):
-
+        if (
+            # 检查是否存在 “分标x” 字眼
+            NotWinBidStandardFormatParser.PATTERN_BID_ITEM_CHECK.search(string)
+            and
+            # 确定不是 分标x 至分标y 的情况
+            len(
+                NotWinBidStandardFormatParser.PATTERN_BID_ITEM_RANGE_CHECK.findall(
+                    string
+                )
+            )
+            == 0
+        ):
             # 根据 。分段，并去除空白字符
             part = list(filter(lambda x: x, string.split("。")))
 
@@ -188,7 +203,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                     raise ParseError(f"废标结果存在新的格式: `{p}`", content=parts)
 
                 # 生成标项信息
-                if isinstance(index, str):
+                if isinstance(index, (str, int)):
                     bid_item = common.get_template_bid_item(
                         index=int(index), is_win=False
                     )

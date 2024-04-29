@@ -12,12 +12,12 @@ NEWSPIDER_MODULE = "collect.spiders"
 ROBOTSTXT_OBEY = False
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 16
+CONCURRENT_REQUESTS = 24
 
 # Configure a delay for requests for the same website (default: 0)
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
-DOWNLOAD_DELAY = 0.5
+DOWNLOAD_DELAY = 0
 
 # 下载超时30
 DOWNLOAD_TIMEOUT = 30
@@ -110,7 +110,7 @@ FEED_EXPORT_ENCODING = "utf-8"
 
 LOG_LEVEL = logging.INFO
 
-LOG_FILE = "logs/out.log"
+# LOG_FILE =  "logs/collect/out.log"
 
 # size / time
 LOG_FILE_TYPE = "time"
@@ -122,10 +122,19 @@ LOG_FILE_BACKUP_COUNT = 50
 # LOG_FILE_MAX_BYTES = 5 * 1024 * 1024
 
 # 生成文件间隔，单位为 ``LOG_FILE_ROTATION``，当 ``LOG_FILE_TYPE`` 设置为 time 生效
-LOG_FILE_INTERVAL = 15
+LOG_FILE_INTERVAL = 4
 
 # 日志文件生成间隔单位：second / minute / hour / day /
-LOG_FILE_ROTATION_UNIT = "minute"
+LOG_FILE_ROTATION_UNIT = "hour"
+
+# 自动调节
+AUTOTHROTTLE_ENABLED=True
+
+# 下载延迟
+AUTOTHROTTLE_START_DELAY=2
+
+# 最大延迟
+AUTOTHROTTLE_MAX_DELAY=10
 
 # ======== ResponseDebugMiddleware =================
 # 是否设置 ResponseDebugMiddleware 的调试

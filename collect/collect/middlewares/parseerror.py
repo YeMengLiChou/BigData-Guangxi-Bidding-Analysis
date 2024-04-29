@@ -20,16 +20,16 @@ class ParseError(Exception):
     """自定义解析错误"""
 
     def __init__(
-            self,
-            msg: str,
-            article_id: Union[list, None] = None,
-            start_article_id: Union[str, None] = None,
-            parsed_article_id: int = 0,
-            article_ids: Union[list[str], None] = None,
-            is_win: Union[bool, None] = None,
-            content: Union[list, None] = None,
-            error: Union[BaseException, None] = None,
-            timestamp: int = time.now_timestamp(),
+        self,
+        msg: str,
+        article_id: Union[list, None] = None,
+        start_article_id: Union[str, None] = None,
+        parsed_article_id: int = 0,
+        article_ids: Union[list[str], None] = None,
+        is_win: Union[bool, None] = None,
+        content: Union[list, None] = None,
+        error: Union[BaseException, None] = None,
+        timestamp: int = time.now_timestamp(),
     ):
         """
         :param msg: 出错原因
@@ -146,7 +146,7 @@ class ParseErrorHandlerMiddleware:
 
     LOG_FILE_NAME = "parse_errors.log"
 
-    JSON_FILE_NAME = "parse_errors.json"
+    JSON_FILE_NAME = "parse_errors.json1"
 
     def __init__(self, crawler: Crawler):
         settings = crawler.settings
@@ -164,7 +164,9 @@ class ParseErrorHandlerMiddleware:
         self.json_first_write = True
         if os.path.exists(self.json_path):
             if os.path.isdir(self.json_path):
-                raise ValueError(f"JSON_FILE_NAME`{self.JSON_FILE_NAME}` is a directory!")
+                raise ValueError(
+                    f"JSON_FILE_NAME`{self.JSON_FILE_NAME}` is a directory!"
+                )
 
             if os.path.getsize(self.json_path) > 0:
                 self.json_first_write = False
@@ -208,10 +210,15 @@ class ParseErrorHandlerMiddleware:
         """
         if self.closed:
             return
+        if self.json_fp:
+            self.json_fp.write("]")
+            self.json_fp.flush()
+            self.json_fp.close()
+            self.json_fp = None
         self.closed = True
 
     def process_spider_exception(
-            self, response: Response, exception: BaseException, spider: Spider
+        self, response: Response, exception: BaseException, spider: Spider
     ):
         # 处理 ParseError
         if isinstance(exception, ParseError):
@@ -239,7 +246,9 @@ class ParseErrorHandlerMiddleware:
                     self.json_first_write = False
                 else:
                     self.json_fp.write(",")
-                self.json_fp.write(json.dumps(exception.to_dict(), ensure_ascii=False, indent=4))
+                self.json_fp.write(
+                    json.dumps(exception.to_dict(), ensure_ascii=False, indent=4)
+                )
 
             return []
 

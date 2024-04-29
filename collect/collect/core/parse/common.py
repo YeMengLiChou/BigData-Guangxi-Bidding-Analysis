@@ -4,8 +4,9 @@ from typing import Union, Callable
 
 from lxml import etree
 
+import utils.debug_stats
 from collect.collect.middlewares import ParseError
-from utils import symbol_tools as sym
+from utils import symbol_tools as sym, log
 from utils import debug_stats as stats
 from constants import (
     ProjectKey,
@@ -374,7 +375,7 @@ def get_template_bid_item(is_win: bool, index: int, name: str = None) -> dict:
 
 
 PATTERN_PURCHASER = re.compile(
-    r"(?:采购|征集|招标)人(?:信息|)(?:\S*?名称\S*?)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
+    r"(?:采购|釆购|征集|招标)人(?:信息|)(?:\S*?名称\S*?)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
 )
 
 PATTERN_PURCHASER_AGENCY = re.compile(
@@ -402,19 +403,6 @@ def parse_contact_info(part: str) -> dict:
         data[ProjectKey.PURCHASER_AGENCY] = match.group(1)
     else:
         data[ProjectKey.PURCHASER_AGENCY] = None
-
-    if data[ProjectKey.PURCHASER] is None or data[ProjectKey.PURCHASER_AGENCY] is None:
-        # 某些只有一个名称
-        if part.count("名称") == 1:
-            return data
-        raise ParseError(
-            msg="出现新的联系方式内容",
-            content=[
-                f"purchaser 解析结果:{data[ProjectKey.PURCHASER]}",
-                f"agency 解析结果:{data[ProjectKey.PURCHASER_AGENCY]}",
-                part,
-            ],
-        )
 
     return data
 
@@ -519,6 +507,19 @@ def calculate_total_budget(bid_items: list):
 keys = []
 # 排除的key，需要单独设置
 exclude_keys = [ProjectKey.TOTAL_BUDGET, ProjectKey.TOTAL_AMOUNT]
+
+if utils.debug_stats.DEBUG_STATUS:
+    exclude_keys += [
+        ProjectKey.ANNOUNCEMENT_TYPE,
+        ProjectKey.RESULT_PUBLISH_DATE,
+        ProjectKey.AUTHOR,
+        ProjectKey.DISTRICT_CODE,
+        ProjectKey.CATALOG,
+        ProjectKey.PROCUREMENT_METHOD,
+        ProjectKey.BID_OPENING_TIME,
+        ProjectKey.IS_TERMINATION,
+        ProjectKey.TERMINATION_REASON,
+    ]
 for _k, v in vars(ProjectKey).items():
     if _k.isupper() and v not in exclude_keys:
         keys.append(v)
@@ -541,52 +542,65 @@ def make_item(result_data: dict, purchase_data: Union[dict, None]):
                 ProjectKey.BID_ITEMS, []
             )
         else:
-            # 合并标项
-            purchase_bid_items = purchase_data.pop(ProjectKey.BID_ITEMS, [])
-            result_bid_items = result_data.get(ProjectKey.BID_ITEMS, [])
-            result_data[ProjectKey.BID_ITEMS] = _merge_bid_items(
-                _purchase=purchase_bid_items,
-                _result=result_bid_items,
-                cancel_reason_only_one=result_data.get(
-                    CollectDevKey.BIDDING_CANCEL_REASON_ONLY_ONE, False
-                ),
-                data=result_data,
-            )
+            # 采购公告存在特殊格式，没有标项信息，不进行合并
+            if not purchase_data.get(CollectDevKey.PURCHASE_SPECIAL_FORMAT_1, False):
+                # 合并标项
+                purchase_bid_items = purchase_data.pop(ProjectKey.BID_ITEMS, [])
+                result_bid_items = result_data.get(ProjectKey.BID_ITEMS, [])
+                result_data[ProjectKey.BID_ITEMS] = _merge_bid_items(
+                    _purchase=purchase_bid_items,
+                    _result=result_bid_items,
+                    cancel_reason_only_one=result_data.get(
+                        CollectDevKey.BIDDING_CANCEL_REASON_ONLY_ONE, False
+                    ),
+                    data=result_data,
+                )
+            else:
+                # 删除空的列表，防止下面update时覆盖
+                purchase_data.pop(ProjectKey.BID_ITEMS)
         result_data.update(purchase_data)
 
     # 从 data 中取出所需要的信息
     item = {k: result_data[k] for k in keys}
 
     # TODO： 设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
-    if not item[ProjectKey.DISTRICT_CODE]:
-        raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))
+    if not utils.debug_stats.DEBUG_STATUS:
+        if not item[ProjectKey.DISTRICT_CODE]:
+            raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))
 
-    # 项目总预算
-    total_budget = result_data.get(ProjectKey.TOTAL_BUDGET, None)
-    calculated_budget = calculate_total_budget(
-        bid_items=result_data[ProjectKey.BID_ITEMS]
-    )
-    # 如果项目总预算存在，则需要和计算后的预算进行对比
-    if total_budget:
-        if abs(calculated_budget - total_budget) > 1e-5:
-            raise ParseError(
-                msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致（误差大于1e-5）",
-                content=result_data[ProjectKey.BID_ITEMS],
-            )
+    # 如果采购公告能拿到标项的预算，那么进行计算验证
+    if not result_data.get(CollectDevKey.PURCHASE_SPECIAL_FORMAT_1, False):
+        # 项目总预算
+        total_budget = result_data.get(ProjectKey.TOTAL_BUDGET, None)
+        calculated_budget = calculate_total_budget(
+            bid_items=result_data[ProjectKey.BID_ITEMS]
+        )
+        # 如果项目总预算存在，则需要和计算后的预算进行对比
+        if total_budget:
+            if abs(calculated_budget - total_budget) > 1e-5:
+                raise ParseError(
+                    msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致（误差大于1e-5）",
+                    content=result_data[ProjectKey.BID_ITEMS],
+                )
+            else:
+                item[ProjectKey.TOTAL_BUDGET] = calculated_budget
         else:
             item[ProjectKey.TOTAL_BUDGET] = calculated_budget
     else:
-        item[ProjectKey.TOTAL_BUDGET] = calculated_budget
+        item[ProjectKey.TOTAL_BUDGET] = result_data[ProjectKey.TOTAL_BUDGET]
 
     # 计算总金额
     if item[ProjectKey.IS_WIN_BID]:
+        budget = item[ProjectKey.TOTAL_BUDGET]
         item[ProjectKey.TOTAL_AMOUNT] = calculate_total_amount(
             bid_items=item[ProjectKey.BID_ITEMS],
-            budget=item[ProjectKey.TOTAL_BUDGET],
+            budget=budget if budget > 0 else 0,
         )
     else:
         item[ProjectKey.TOTAL_AMOUNT] = 0
 
+    if utils.debug_stats.DEBUG_STATUS:
+        log.json(logger.info, item)
     return item
 
 

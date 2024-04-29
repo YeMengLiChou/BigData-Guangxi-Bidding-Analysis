@@ -11,6 +11,7 @@ from scrapy.crawler import Crawler
 from scrapy.http import Response
 from typing_extensions import Self
 
+from config.config import settings
 from collect.collect.core.api.category import CategoryApi
 from collect.collect.core.api.detail import DetailApi
 from collect.collect.core.error import SwitchError
@@ -18,11 +19,11 @@ from collect.collect.core.parse import result, purchase, common
 from collect.collect.core.parse.result import errorhandle
 from collect.collect.middlewares import ParseError
 from constants import ProjectKey, CollectDevKey, StatsKey
+from utils import debug_stats as stats
 from utils import (
     redis_tools as redis,
     time as time_tools,
 )
-from utils import debug_stats as stats
 
 logger = logging.getLogger(__name__)
 
@@ -177,8 +178,11 @@ class BiddingSpider(scrapy.Spider):
         # 从redis中读取最新的公告时间戳
         redis_timestamp = redis.get_latest_announcement_timestamp(parse_to_str=True)
 
-        self.publish_date_begin = datetime.datetime(year=2022, month=1, day=1)
-        self.publish_date_end = datetime.datetime(year=2022, month=1, day=1)
+        begin = getattr(settings, "scrapy.publish_date_begin", [2022, 1, 1])
+        end = getattr(settings, "scrapy.publish_date_end", [2022, 1, 30])
+
+        self.publish_date_begin = datetime.datetime(year=begin[0], month=begin[1], day=begin[2])
+        self.publish_date_end = datetime.datetime(year=end[0], month=end[1], day=end[2])
         logging.info(
             f"Ensured span:\n"
             f"redis_latest_timestamp: {redis_timestamp}\n"
@@ -186,6 +190,11 @@ class BiddingSpider(scrapy.Spider):
             f"publish_date_end: {self.publish_date_end}"
         )
         self.debug = False
+
+        module = importlib.import_module("collect.collect.spiders.filtered_error_articles")
+        if ids := getattr(module, "ids", None):
+            redis.add_unique_article_ids(ids)
+            logger.info(f"fetch {len(ids)} records to filter!")
 
         # 读取特殊article_id
         module = importlib.import_module("collect.collect.spiders.error_article_ids")
@@ -477,7 +486,6 @@ class BiddingSpider(scrapy.Spider):
                         logger.warning(f"该公告为征集公告，跳过 title: `{title}`")
                         return
 
-                    # TODO: 判断是否为中标候选人公示，后期完善
                     if title and ("中标候选人" in title):
                         meta[CollectDevKey.RESULT_CONTAINS_CANDIDATE] = True
 
@@ -524,7 +532,7 @@ class BiddingSpider(scrapy.Spider):
                 else:
                     # 存在 “采购公告”
                     yield _make_detail_request(
-                        article_id=purchase_article_ids[0],
+                        article_id=purchase_article_ids[-1],  # 从最后一个开始
                         callback=self.parse_purchase,
                         meta=meta,
                     )
@@ -599,7 +607,8 @@ class BiddingSpider(scrapy.Spider):
         """
         parsed: int = meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID]
         purchase_ids = meta[ProjectKey.PURCHASE_ARTICLE_ID]
-        for i in range(len(purchase_ids)):
+        # 从后面开始，后面大概会比前面更准确
+        for i in range(len(purchase_ids) - 1, -1, -1):
             if ((parsed >> i) & 1) == 0:
                 return _make_detail_request(
                     article_id=purchase_ids[i], callback=self.parse_purchase, meta=meta
@@ -666,8 +675,12 @@ class BiddingSpider(scrapy.Spider):
                         yield self.switch_other_purchase_announcement(meta)
                         return None
 
-                # 更新 html 内容
-                purchase_data = purchase.parse_html(html_content=data["content"])
+                try:
+                    # 更新 html 内容
+                    purchase_data = purchase.parse_html(html_content=data["content"])
+                except ParseError as e:
+                    yield self.switch_other_purchase_announcement(meta=meta)
+                    return
 
                 # 生成 item
                 yield common.make_item(result_data=meta, purchase_data=purchase_data)

@@ -8,6 +8,7 @@ from scrapy.crawler import Crawler
 
 import constants
 
+
 class DebugPipeline:
     """
     将爬虫返回的item写入文件，用于调试

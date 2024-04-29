@@ -31,10 +31,13 @@ def fetch_from_json(path: str, dst_path: str, append: bool = True):
     :return:
     """
     with open(path, mode="r", encoding="utf-8") as f:
-        data = json.load(f)
+        content = f.read()
+        if content.endswith(","):
+            content = content[:-1] + ']'
+        data = json.loads(content)
 
     old_ids = fetch_from_txt(dst_path)
-    new_ids = []
+    new_ids = set()
     for item in data:
         comment = item["msg"]
         article_info = item["article_info"]
@@ -47,9 +50,9 @@ def fetch_from_json(path: str, dst_path: str, append: bool = True):
         value = (article_id, win, comment)
         if append:
             if value not in old_ids:
-                new_ids.append(value)
+                new_ids.add(value)
         else:
-            new_ids.append(value)
+            new_ids.add(value)
 
     with open(dst_path, mode="a" if append else "w", encoding="utf-8") as f:
         for item in new_ids:
@@ -73,7 +76,7 @@ def dumps_txt_to_py(path: str, dst_path: str):
 
 if __name__ == "__main__":
     fetch_from_json(
-        path="../logs/parse_errors.json",
+        path="../logs/parse_errors.json1",
         dst_path="./error_article_ids.txt",
         append=False,
     )

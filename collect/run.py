@@ -16,10 +16,19 @@ class LevelFilter(logging.Filter):
     """
     设置最低的日志等级
     """
+
     def __init__(self, level: int):
         logging.Filter.__init__(self)
-        if level not in (logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL):
-            raise ValueError("level must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL")
+        if level not in (
+            logging.DEBUG,
+            logging.INFO,
+            logging.WARNING,
+            logging.ERROR,
+            logging.CRITICAL,
+        ):
+            raise ValueError(
+                "level must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL"
+            )
         self.level = level
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -100,7 +109,6 @@ def configure_logging(settings: Settings):
                 interval=interval,
                 backupCount=backup_count,
                 utc=False,
-
             )
         elif log_type == "size":
             max_bytes = settings.getint("LOG_FILE_MAX_BYTES")
@@ -167,16 +175,16 @@ def _run_spider(spider_name: str, _settings: Settings):
     crawler_process = CrawlerProcess(_settings, install_root_handler=False)
     crawl_defer = crawler_process.crawl(spider_name)
     if getattr(crawl_defer, "result", None) is not None and issubclass(
-            crawl_defer.result.type, Exception
+        crawl_defer.result.type, Exception
     ):
         exitcode = 1
     else:
         crawler_process.start()
 
         if (
-                crawler_process.bootstrap_failed
-                or hasattr(crawler_process, "has_exception")
-                and crawler_process.has_exception
+            crawler_process.bootstrap_failed
+            or hasattr(crawler_process, "has_exception")
+            and crawler_process.has_exception
         ):
             exitcode = 1
         else:

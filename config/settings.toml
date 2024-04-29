@@ -3,13 +3,17 @@ host = "127.0.0.1"
 port = 6379
 db = 0
 
+[scrapy]
+publish_date_begin=[2023, 4, 1]
+publish_date_end=[2023, 4, 30]
+
 [kafka]
 host = "172.27.237.77"  # wsl
 #host = "172.17.160.199" # aliyun
 port = 9092
 
 [kafka.scrapy]
-topic="scrapy_data_1"
+topic="scrapy_data_2"
 key="an"
 
 [debug]

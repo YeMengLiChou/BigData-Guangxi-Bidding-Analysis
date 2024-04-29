@@ -174,6 +174,16 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 idx += 1
         return data
 
+    PATTERN_S1_SUPPLIER_NAME = re.compile(
+        r"(?:\d\.)?供应商(?:名称)?[:：](\S+?)(?:\d\.)?供应商地址"
+    )
+    PATTERN_S1_SUPPLIER_ADDR = re.compile(
+        r"(?:\d\.)?供应商地址[:：](\S+?)(?:\d\.)?(?:中标（成交）金额|中标金额|成交金额|中标下浮系数|中标折扣率|中标金额/单价)"
+    )
+    PATTERN_S1_AMOUNT = re.compile(
+        r"(?:\d\.)?(中标（成交）金额|中标金额|成交金额|中标下浮系数|中标折扣率|中标金额/单价)[:：]((\D*)(\d+(?:\.\d*)?)(\D*))(?:\d\.)?\S+"
+    )
+
     @staticmethod
     @stats.function_stats(logger)
     def parse_win_bid_special_1(part: list[str]) -> list:
@@ -187,101 +197,32 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         :param part:
         :return:
         """
-
-        idx, n, data = 0, len(part), []
-        # 默认只有一个item
-        item = common.get_template_bid_item(index=1, is_win=True)
+        string = symbol_tools.remove_all_spaces("".join(part))
+        print("bid_info: ", string)
+        item = common.get_template_bid_item(is_win=True, index=1)
+        data = [item]
         cnt = 0
-
-        def check_title():
-            """
-            检查标题是否是标题
-            :return:
-            """
-            if "供应商名称" in part[idx]:
-                return True
-            if "供应商地址" in part[idx]:
-                return True
-            if (
-                "中标（成交）金额" in part[idx]
-                or "中标金额" in part[idx]
-                or "成交金额" in part[idx]
-            ):
-                return True
-            return False
-
-        def split_title():
-            """
-            将连在一起的内容分离
-            :return:
-            """
-            if not symbol_tools.endswith_colon_symbol(part[idx]):
-                colon_idx = part[idx].find("：")
-                if colon_idx == -1:
-                    colon_idx = part[idx].find(":")
-                part.insert(idx + 1, part[idx][colon_idx + 1 :])
-                nonlocal n
-                n += 1
-
-        def get_content(item_key: str):
-            """
-            将该片段截取出来，存到 ``item`` 对应的 ``item_key`` 中
-            :param item_key:
-            :return:
-            """
-            split_title()
-            nonlocal idx, cnt, item
-            idx += 1
-            t_idx = idx
-            while (
-                idx < n
-                and common.startswith_number_index(part[idx]) == -1
-                and not check_title()
-            ):
-                idx += 1
-            item[item_key] = "".join(part[t_idx:idx])
+        # 供应商名称
+        if match := WinBidStandardFormatParser.PATTERN_S1_SUPPLIER_NAME.search(string):
+            item[BidItemKey.SUPPLIER] = match.group(1)
+            cnt += 1
+        # 供应商地址
+        if match := WinBidStandardFormatParser.PATTERN_S1_SUPPLIER_ADDR.search(string):
+            item[BidItemKey.SUPPLIER_ADDRESS] = match.group(1)
+            cnt += 1
+        # 中标金额
+        if match := WinBidStandardFormatParser.PATTERN_S1_AMOUNT.search(string):
+            desc, amount = match.group(1), match.group(2)
+            item[BidItemKey.AMOUNT], item[BidItemKey.IS_PERCENT] = (
+                AbstractFormatParser.parse_amount(amount_str=f"{desc}:{amount}")
+            )
             cnt += 1
 
-        while idx < n:
-            if "供应商名称" in part[idx]:
-                get_content(BidItemKey.SUPPLIER)
-            elif "供应商地址" in part[idx]:
-                get_content(BidItemKey.SUPPLIER_ADDRESS)
-            elif (
-                "中标（成交）金额" in part[idx]
-                or "中标金额" in part[idx]
-                or "成交金额" in part[idx]
-            ):
-                split_title()
-                idx += 1
-                tmp_idx = idx
-                # 某些情况下存在金额 “xxxx.xxx” 会被解析，显示解析后的数目少于 5
-
-                while idx < n and (
-                    common.startswith_number_index(part[idx]) == -1  # 不以 '数字.' 开头
-                    or (
-                        (index := part[idx].find("."))
-                        != -1  # 某些情况存在为小数开头，先找到小数点位置 index
-                        and index < len(part[idx]) - 1  # 确保小数点后面有字符
-                        and part[idx][index + 1].isdigit()  # 小数点后面是数字
-                    )
-                    and not check_title()
-                ):
-                    idx += 1
-
-                amount_text = "".join(part[tmp_idx:idx])
-                amount, is_percent = AbstractFormatParser.parse_amount(
-                    amount_str=amount_text
-                )
-                item[BidItemKey.AMOUNT] = amount
-                item[BidItemKey.IS_PERCENT] = is_percent
-                cnt += 1
-            else:
-                idx += 1
-
         if cnt != 3:
-            raise ParseError(msg="出现特殊的中标信息格式", content=part)
-        data.append(item)
+            raise ParseError(
+                msg=f"出现特殊的中标信息格式, {item[BidItemKey.SUPPLIER]}, {item[BidItemKey.SUPPLIER_ADDRESS]}, {item[BidItemKey.AMOUNT]}",
+                content=part,
+            )
         return data
 
     @staticmethod

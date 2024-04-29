@@ -48,13 +48,9 @@ class LogStats:
         )
 
         # 异常数量
-        parse_error_count = self.stats.get_value(
-            StatsKey.PARSE_ERROR_TOTAL, 0
-        )
+        parse_error_count = self.stats.get_value(StatsKey.PARSE_ERROR_TOTAL, 0)
         # kafka发送数量：
-        send_item_count = self.stats.get_value(
-            StatsKey.COLLECT_KAFKA_SEND_COUNT, 0
-        )
+        send_item_count = self.stats.get_value(StatsKey.COLLECT_KAFKA_SEND_COUNT, 0)
         failed_item_count = self.stats.get_value(
             StatsKey.COLLECT_KAFKA_SEND_FAILED_COUNT, 0
         )
@@ -64,9 +60,7 @@ class LogStats:
         planned_crawl_count = self.stats.get_value(
             StatsKey.SPIDER_PLANNED_CRAWL_COUNT, 0
         )
-        actual_crawl_count = self.stats.get_value(
-            StatsKey.SPIDER_ACTUAL_CRAWL_COUNT, 0
-        )
+        actual_crawl_count = self.stats.get_value(StatsKey.SPIDER_ACTUAL_CRAWL_COUNT, 0)
         residual_crawl_count = planned_crawl_count - actual_crawl_count
 
         redis_items_count = redis_tools.count_all_items()
@@ -99,7 +93,7 @@ class LogStats:
             "filtered_count": filtered_count,
             "actual_crawl_count": actual_crawl_count,
             "residual_crawl_count": residual_crawl_count,
-            "item_count_string": item_count_string
+            "item_count_string": item_count_string,
         }
         logger.info(msg, log_args, extra={"spider": spider})
 

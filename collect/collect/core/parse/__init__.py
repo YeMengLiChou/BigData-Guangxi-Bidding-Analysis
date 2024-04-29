@@ -122,7 +122,7 @@ def parse_amount_and_percent(
             # 带有百分比的，一致认为是折扣计算
             if unit == "%":
                 amount, is_percent = float(amount_text), True
-            elif unit == "元":
+            elif unit in ["元", "异常类型"]:
                 amount, is_percent = float(amount_text), False
                 # 不确定该项是否有用
                 return amount, is_percent, False
@@ -134,20 +134,23 @@ def parse_amount_and_percent(
             if unit == "%":
                 if not is_percent:
                     raise ParseError(
-                        f"金额解析异常: `{string}` 的单位：`{unit}` 不匹配预期的 %", content=[string]
+                        f"金额解析异常: `{string}` 的单位：`{unit}` 不匹配预期的 %",
+                        content=[string],
                     )
                 else:
                     return amount, is_percent, True
-            elif unit == "元":
+            elif unit in ["元", "异常类型"]:
                 if is_percent:
                     raise ParseError(
-                        f"金额解析异常: `{string}` 的单位：`{unit}` 不匹配预期的 元", content=[string]
+                        f"金额解析异常: `{string}` 的单位：`{unit}` 不匹配预期的 元",
+                        content=[string],
                     )
                 else:
                     return amount, is_percent, True
             else:
                 raise ParseError(
-                    f"金额解析异常: 无法解析 `{string}` 的 单位：{unit}", content=[string]
+                    f"金额解析异常: 无法解析 `{string}` 的 单位：{unit}",
+                    content=[string],
                 )
 
     # 匹配类型： [大写金额](¥/￥[小写金额])
@@ -179,18 +182,29 @@ class AbstractFormatParser:
         """
         split_sym = symbol_tools.get_symbol(amount_str, (",", "，"), raise_error=False)
         if split_sym:
-            strs = amount_str.split(split_sym)
+            # 特殊情况 (xxx , xx): 1234x
+            idx = amount_str.index(split_sym)
+            if ("（" in amount_str[:idx] and "）" in amount_str[idx + 1 :]) or (
+                "(" in amount_str[:idx] and ")" in amount_str[idx + 1 :]
+            ):
+                strs = [amount_str]
+            else:
+                strs = amount_str.split(split_sym)
         else:
             strs = [amount_str]
 
         if len(strs) == 0:
-            raise ParseError(f"金额解析异常: 无法解析：`{amount_str}`", content=[amount_str])
+            raise ParseError(
+                f"金额解析异常: 无法解析：`{amount_str}`", content=[amount_str]
+            )
 
         # 仅有一行
         if len(strs) == 1:
             amount, is_percent, _ = parse_amount_and_percent(strs[0])
             if amount is None:
-                raise ParseError(f"金额解析异常: 无法解析 `{amount_str}`", content=[amount_str])
+                raise ParseError(
+                    f"金额解析异常: 无法解析 `{amount_str}`", content=[amount_str]
+                )
             else:
                 return amount, is_percent
 

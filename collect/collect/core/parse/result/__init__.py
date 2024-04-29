@@ -85,7 +85,7 @@ def parse_response_data(data: list):
             # 爬取的时间戳
             ProjectKey.SCRAPE_TIMESTAMP: item["publishDate"],
             # 公告类型
-            ProjectKey.ANNOUNCEMENT_TYPE: item['pathName'],
+            ProjectKey.ANNOUNCEMENT_TYPE: item["pathName"],
             # 结果公告的id（可能存在多个）
             ProjectKey.RESULT_ARTICLE_ID: item["articleId"],
             # 发布日期（可能存在多个）
@@ -132,7 +132,7 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
         return PartKey.REVIEW_EXPERT
 
     # 联系方式部分
-    if "以下方式联系" in title or "联系方式" in title:
+    if "以下方式联系" in title or "联系方式" in title or "联系事项" in title:
         return PartKey.CONTACT
 
     if is_win:
@@ -142,10 +142,16 @@ def check_useful_part(is_win: bool, title: str) -> Union[int, None]:
     else:
         # 废标结果部分
         if (
-            (("废标" in title or "流标") and ("原因" in title or "理由" in title))
+            (
+                ("废标" in title or "流标" in title)
+                or ("原因" in title or "理由" in title)
+            )
             or ("采购结果信息" in title)
             or ("采购结果" in title)
+            or ("采购信息" in title)
             or ("结果信息" in title)
+            or ("项目结果" in title)
+            or ("中标（成交）信息" in title)
         ):
             return PartKey.NOT_WIN_BID
         # 终止原因
