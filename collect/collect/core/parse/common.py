@@ -563,7 +563,7 @@ def make_item(result_data: dict, purchase_data: Union[dict, None]):
     # 从 data 中取出所需要的信息
     item = {k: result_data[k] for k in keys}
 
-    # TODO： 设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
+    # TODO：设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
     if not utils.debug_stats.DEBUG_STATUS:
         if not item[ProjectKey.DISTRICT_CODE]:
             raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))

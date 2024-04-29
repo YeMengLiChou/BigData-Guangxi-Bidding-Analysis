@@ -17,5 +17,5 @@ topic="scrapy_data_2"
 key="an"
 
 [debug]
-#enable = true
-enable = false
+enable = true
+#enable = false

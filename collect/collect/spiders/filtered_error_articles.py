@@ -19,4 +19,5 @@ filtered_ids = [
     "Uj3s+af6mnQD1d5//Bf4sw==",  # 资格审查公告，无标项信息.
     "riqzZfQUeInYSzETCVoKMw==",  # 资格审查公告，无标项信息.
     "VdZhBUDBZOuLS5HCfii5nQ==",  # 资格审查公告，无标项信息.
+    "On+5gE1SAIObcie5IBKAQQ==",  # 中标金额过于复杂
 ]

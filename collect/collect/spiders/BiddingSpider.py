@@ -108,7 +108,7 @@ def _parse_other_announcements(other_announcements: list, meta: dict):
 
         type_name = item["typeName"]
         # 采购公告
-        if "采购" in type_name:
+        if "采购" in type_name and "监" not in type_name:
             purchase_article_ids.append(item["articleId"])
             purchase_publish_dates.append(publish_date)
         # 结果公告
@@ -283,14 +283,14 @@ class BiddingSpider(scrapy.Spider):
 
     @stats.function_stats(logger)
     def _make_result_request(
-        self,
-        page_no: int,
-        page_size: int,
-        publish_date_begin: str,
-        publish_date_end: str,
-        callback: callable,
-        dont_filter: bool = False,
-        priority: int = 0,
+            self,
+            page_no: int,
+            page_size: int,
+            publish_date_begin: str,
+            publish_date_end: str,
+            callback: callable,
+            dont_filter: bool = False,
+            priority: int = 0,
     ):
         """
         生成结果列表的请求
@@ -347,13 +347,13 @@ class BiddingSpider(scrapy.Spider):
             priority_start = -10000
             # 因为api最多只能检索到1w条数据，因此不能一次性选择很大的时间范围，这里选择拆分为一个月的时间跨度
             for year in range(
-                self.publish_date_begin.year, self.publish_date_end.year + 1
+                    self.publish_date_begin.year, self.publish_date_end.year + 1
             ):
                 for month in range(1, 13):
                     # 跳过超出时间范围的
                     if (
-                        year == self.publish_date_end.year
-                        and month > self.publish_date_end.month
+                            year == self.publish_date_end.year
+                            and month > self.publish_date_end.month
                     ):
                         continue
 
@@ -499,7 +499,7 @@ class BiddingSpider(scrapy.Spider):
 
                     # 判断是否为所需要的结果公告
                     if data["announcementType"] and common.check_unuseful_announcement(
-                        data["announcementType"]
+                            data["announcementType"]
                     ):
                         raise SwitchError("该结果公告并非所需要的")
 

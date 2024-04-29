@@ -58,6 +58,7 @@ def parse_amount_and_percent(
     :return:
     """
     string = symbol_tools.remove_all_spaces(string)
+
     # 格式：数字+单位
     if match := PATTERN_NUMBER_UNIT.fullmatch(string):
         amount_text, unit = match.groups()
@@ -77,13 +78,14 @@ def parse_amount_and_percent(
         # 前缀描述，金额数字，小数位，单位
         desc, amount_text, unit = match.groups()
         parsed = True
-
         # 服务总报价、竞标总报价、响应总报价、总价、最终评审价、最后报价、最终报价、投标总价、磋商总报价、投标总报价、单价报价合计、总价大写、金额
         if check_substrings_in_string(
             desc, substrings=("总价", "总报价", "最终", "最后", "合计", "金额", "合价")
         ):
             amount, is_percent = float(amount_text), False
-            if check_substrings_in_string(desc, substrings=("系数", "率")):
+            if check_substrings_in_string(desc, substrings=("下浮系数", "让利")):
+                amount = 100 - amount
+            elif check_substrings_in_string(desc, substrings=("系数", "率")):
                 # 仅有单位为 % 才能设置（ex 单项合价（元） ③＝①×②/费率:650000(元)）
                 if unit == "%":
                     is_percent = True
@@ -93,7 +95,9 @@ def parse_amount_and_percent(
         # 报价、报价大写、投标报价、响应报价、竞标报价、磋商报价、
         elif check_substrings_in_string(desc, substrings=("报价", "单价", "价格")):
             amount, is_percent = float(amount_text), False
-            if check_substrings_in_string(desc, substrings=("系数", "率")):
+            if check_substrings_in_string(desc, substrings=("下浮系数", "让利")):
+                amount = 100 - amount
+            elif check_substrings_in_string(desc, substrings=("系数", "率")):
                 # 仅有单位为 % 才能设置（ex 单项合价（元） ③＝①×②/费率:650000(元)）
                 if unit == "%":
                     is_percent = True
@@ -182,14 +186,33 @@ class AbstractFormatParser:
         """
         split_sym = symbol_tools.get_symbol(amount_str, (",", "，"), raise_error=False)
         if split_sym:
+            strs = amount_str.split(split_sym)
+
             # 特殊情况 (xxx , xx): 1234x
             idx = amount_str.index(split_sym)
-            if ("（" in amount_str[:idx] and "）" in amount_str[idx + 1 :]) or (
-                "(" in amount_str[:idx] and ")" in amount_str[idx + 1 :]
-            ):
+            ll, rr = amount_str[:idx], amount_str[idx + 1 :]
+            lp = symbol_tools.get_symbol(ll, ("（", "("), raise_error=False)
+            rp = symbol_tools.get_symbol(rr, (")", "）"), raise_error=False)
+            l_idx, r_idx, r_len = len(ll) - 1, 0, len(rr)
+            ok = True
+            while l_idx >= 0:
+                if ll[l_idx] == lp:
+                    break
+                elif ll[l_idx] == rp:
+                    ok = False
+                    break
+            if ok:
+                while r_idx < r_len:
+                    if rr[r_idx] == rp:
+                        break
+                    elif rr[r_idx] == lp:
+                        ok = False
+                        break
+                    r_idx += 1
+
+            if ok:
                 strs = [amount_str]
-            else:
-                strs = amount_str.split(split_sym)
+
         else:
             strs = [amount_str]
 

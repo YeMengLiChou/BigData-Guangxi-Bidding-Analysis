@@ -54,10 +54,10 @@ def dumps_to_console(content: str):
     json_data = json.loads(content)
     for i in range(0, len(json_data)):
         item = json_data[i]
-        if item["msg"].startswith("基本情况解析失败："):
-            continue
-        if not item['msg'].startswith("生成 item 时出现异常"):
-            continue
+        # if item["msg"].startswith("基本情况解析失败："):
+        #     continue
+        # if not item['msg'].startswith("生成 item 时出现异常"):
+        #     continue
         print(f"msg: {item['msg']}")
         print("article_info")
         article_info = item["article_info"]
@@ -82,11 +82,11 @@ def dumps_to_console(content: str):
 
         request_detail(article_id=ids)
         print(
-            f"{i}------------------------------------------------------------------------------------------------\n"
+            f"---------------------------- {i}/{len(json_data)-1} -------------------------------------------------\n"
         )
         input("enter to next: ")
 
 
 if __name__ == "__main__":
-    dumps_to_console(content=load_from_json(json_path="./../logs/parse_errors.json1"))
+    dumps_to_console(content=load_from_json(json_path="./../logs/server-log2/parse_errors.json1"))
     # print(1 / 0)

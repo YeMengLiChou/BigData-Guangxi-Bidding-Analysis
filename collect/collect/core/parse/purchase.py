@@ -3,6 +3,7 @@ import logging
 import re
 from typing import Union
 
+import utils.debug_stats
 from collect.collect.core.error import SwitchError
 from collect.collect.core.parse import common, AbstractFormatParser
 from collect.collect.core.parse.errorhandle import raise_error
@@ -66,22 +67,23 @@ class StandardFormatParser(AbstractFormatParser):
         bidding_items = []
         data[ProjectKey.BID_ITEMS] = bidding_items
 
+        # 项目编号
         if match := StandardFormatParser.PATTERN_PROJECT_INFO_PROJECT_CODE.search(
-            prefix
+                prefix
         ):
             data[ProjectKey.CODE] = match.group(1)
         else:
             data[ProjectKey.CODE] = None
 
-        # 正则表达式匹配基本信息
+        # 项目名称
         if match := StandardFormatParser.PATTERN_PROJECT_INFO_PROJECT_NAME.search(
-            prefix
+                prefix
         ):
-            # 项目名称
             data[ProjectKey.NAME] = match.group(1)
         else:
             data[ProjectKey.NAME] = None
 
+        # 预算
         if match := StandardFormatParser.PATTERN_PROJECT_INFO_BUDGET.search(prefix):
             # 总预算
             total_budget = float(match.group(1))
@@ -95,6 +97,7 @@ class StandardFormatParser(AbstractFormatParser):
             contains_budget = False
             # 如果不存在总预算，那么这里需要设置为 0
             total_budget = 0
+            data[ProjectKey.TOTAL_BUDGET] = total_budget
 
         # 不包含采购需求
         if not contains_suffix:
@@ -141,7 +144,7 @@ class StandardFormatParser(AbstractFormatParser):
             if contains_budget and total_budget > 1e-5:
                 raise ParseError(
                     msg="标项预算合计与总预算不符",
-                    content=bidding_items + [(f"total_budget: {total_budget}")],
+                    content=bidding_items + [f"total_budget: {total_budget}"],
                 )
             if not contains_budget:
                 data[ProjectKey.TOTAL_BUDGET] = total_budget
@@ -149,6 +152,9 @@ class StandardFormatParser(AbstractFormatParser):
         else:
             # 存在特殊情况：7iWKD4Bl0oC8XVdxmCJSQg== 如该公告所示，其标项格式与上面正常采购不同
             data[CollectDevKey.PURCHASE_SPECIAL_FORMAT_1] = True
+
+        if utils.debug_stats.DEBUG_STATUS:
+            logger.warning(data)
 
         return data
 

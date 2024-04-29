@@ -178,10 +178,10 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         r"(?:\d\.)?供应商(?:名称)?[:：](\S+?)(?:\d\.)?供应商地址"
     )
     PATTERN_S1_SUPPLIER_ADDR = re.compile(
-        r"(?:\d\.)?供应商地址[:：](\S+?)(?:\d\.)?(?:中标（成交）金额|中标金额|成交金额|中标下浮系数|中标折扣率|中标金额/单价)"
+        r"(?:\d\.)?供应商地址[:：](\S+?)(?:\d\.)?(?:中标（成交）金额|中标金额|成交金额|中标下浮系数|中标折扣率|中标金额/单价|成交报价)"
     )
     PATTERN_S1_AMOUNT = re.compile(
-        r"(?:\d\.)?(中标（成交）金额|中标金额|成交金额|中标下浮系数|中标折扣率|中标金额/单价)[:：]((\D*)(\d+(?:\.\d*)?)(\D*))(?:\d\.)?\S+"
+        r"(?:\d\.)?(中标（成交）金额|中标金额|成交金额|中标下浮系数|中标折扣率|中标金额/单价|成交报价)[:：]((\D*)(\d+(?:\.\d*)?)(\D*))(?:\d\.)?\S+"
     )
 
     @staticmethod
@@ -198,7 +198,6 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         :return:
         """
         string = symbol_tools.remove_all_spaces("".join(part))
-        print("bid_info: ", string)
         item = common.get_template_bid_item(is_win=True, index=1)
         data = [item]
         cnt = 0
