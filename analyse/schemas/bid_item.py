@@ -1,5 +1,6 @@
 from pyspark.sql.types import *
-from constants import ProjectKey, BidItemKey
+
+from constants import BidItemKey
 
 """
 标项信息格式

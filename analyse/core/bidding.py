@@ -1,25 +1,57 @@
-import datetime
-from typing import Any
-from pyspark.sql import DataFrame, functions as func, Column
-from constants import ProjectKey
-from utils import dataframe_tools as df_utils
+from pyspark.sql import DataFrame, functions as func, GroupedData
+from pyspark.sql.types import IntegerType
+from analyse.core import common
+from constants import ProjectKey, DevConstants
+from utils import dataframe_tools as df_utils, dataframe_tools
 
 
-def append_columns(df: DataFrame, columns: dict[str, Any]) -> DataFrame:
-    """
-    添加指定的列到 ``df`` 中
-    """
-    for col_name, value in columns.items():
-        df = df.withColumn(col_name, value)
-    return df
+def __win_bidding_result(df: DataFrame) -> DataFrame:
+    # 过滤中标的结果
+    df = df.filter(func.col(ProjectKey.IS_WIN_BID)).drop(ProjectKey.IS_WIN_BID)
+
+    def agg_func(gd: GroupedData, columns: list[str]) -> DataFrame:
+        if "win_count" not in columns:
+            return gd.agg(func.count("*").alias("win_count"))
+        else:
+            return gd.agg(func.sum("win_count").alias("win_count"))
+
+    return common.stats_all(
+        df, groupby_cols=[ProjectKey.DISTRICT_CODE], agg_func=agg_func
+    )
+
+
+def __lose_bidding_result(df: DataFrame) -> DataFrame:
+    # 过滤废标结果
+    df = df.filter(func.col("is_lose_bid")).drop("is_lose_bid")
+
+    def agg_func(gd: GroupedData, columns: list[str]) -> DataFrame:
+        if "lose_count" not in columns:
+            return gd.agg(func.count("*").alias("lose_count"))
+        else:
+            return gd.agg(func.sum("lose_count").alias("lose_count"))
+
+    return common.stats_all(
+        df, groupby_cols=[ProjectKey.DISTRICT_CODE], agg_func=agg_func
+    )
+
+
+def __terminate_bidding_result(df: DataFrame) -> DataFrame:
+    # 过滤终止结果
+    df = df.filter(func.col(ProjectKey.IS_TERMINATION)).drop(ProjectKey.IS_TERMINATION)
+
+    def agg_func(gd: GroupedData, columns: list[str]) -> DataFrame:
+        if "terminate_count" not in columns:
+            return gd.agg(func.count("*").alias("terminate_count"))
+        else:
+            return gd.agg(func.sum("terminate_count").alias("terminate_count"))
+
+    return common.stats_all(
+        df, groupby_cols=[ProjectKey.DISTRICT_CODE], agg_func=agg_func
+    )
 
 
 def bidding_result(
     df: DataFrame,
-    district_groupby: bool = True,
-    year: int = None,
-    month: int = None,
-    quarter: int = None,
 ) -> DataFrame:
     """
     统计中标、废标、终止数量
@@ -30,101 +62,49 @@ def bidding_result(
 
     ----------
     :param df
-    :param district_groupby 是否按 ProjectKey.DISTRICT_CODE 分组
-    :param year 指定的年
-    :param month 指定的月
-    :param quarter 指定的季度
     """
 
-    groupby_cols = [ProjectKey.DISTRICT_CODE]
-    if not district_groupby:
-        df = df.withColumn(ProjectKey.DISTRICT_CODE, func.lit(0))
-
-    time_condition = df_utils.get_time_span_condition(
-        ProjectKey.SCRAPE_TIMESTAMP, year, month, quarter
+    df = df.select(
+        ProjectKey.DISTRICT_CODE,
+        ProjectKey.SCRAPE_TIMESTAMP,
+        ProjectKey.IS_WIN_BID,
+        ProjectKey.IS_TERMINATION,
+    )
+    win_df = __win_bidding_result(
+        df.select(
+            ProjectKey.DISTRICT_CODE, ProjectKey.SCRAPE_TIMESTAMP, ProjectKey.IS_WIN_BID
+        )
+    )
+    lose_df = __lose_bidding_result(
+        df.withColumn(
+            "is_lose_bid",
+            (~func.col(ProjectKey.IS_WIN_BID)) & (~func.col(ProjectKey.IS_TERMINATION)),
+        ).select(ProjectKey.DISTRICT_CODE, ProjectKey.SCRAPE_TIMESTAMP, "is_lose_bid")
+    )
+    terminate_df = __terminate_bidding_result(
+        df.select(
+            ProjectKey.DISTRICT_CODE,
+            ProjectKey.SCRAPE_TIMESTAMP,
+            ProjectKey.IS_TERMINATION,
+        )
     )
 
-    # 过滤出 成交结果
-    condition = func.col(ProjectKey.IS_WIN_BID)
-    if time_condition is not None:
-        condition = condition & time_condition
-
-    wins_by_district = df_utils.filter_and_count(
-        df,
-        condition=condition,
-        groupby_cols=groupby_cols,
-        count_col_name="wins_count",
+    res_df = dataframe_tools.join_dataframes(
+        dfs=[win_df, lose_df, terminate_df],
+        depend_on=[ProjectKey.DISTRICT_CODE, "year", "month", "day", "quarter"],
+        how_join="outer",
     )
 
-    # 过滤出 废标结果
-    condition = (~func.col(ProjectKey.IS_WIN_BID)) & (
-        ~func.col(ProjectKey.IS_TERMINATION)
-    )
-    if time_condition is not None:
-        condition = condition & time_condition
-
-    lose_by_district = df_utils.filter_and_count(
-        df,
-        condition=condition,
-        groupby_cols=groupby_cols,
-        count_col_name="lose_count",
+    res_df = dataframe_tools.replace_null(
+        res_df, ["win_count", "lose_count", "terminate_count"], 0
     )
 
-    # 过滤出 终止结果
-    condition = func.col(ProjectKey.IS_TERMINATION)
-    if time_condition is not None:
-        condition = condition & time_condition
-    terminate_by_district = df_utils.filter_and_count(
-        df,
-        condition=condition,
-        groupby_cols=groupby_cols,
-        count_col_name="terminate_count",
-    )
-
-    # 根据 地区 统计各个地区的公告次数
-    total_transactions_by_district = df.groupBy(ProjectKey.DISTRICT_CODE).agg(
-        func.count("*").alias("total_count")
-    )
-
-    # 将这些内容合并
-    merged_df = df_utils.merge_dataframes(
-        dfs=[
-            total_transactions_by_district,
-            wins_by_district,
-            lose_by_district,
-            terminate_by_district,
-        ],
-        depend_on=[ProjectKey.DISTRICT_CODE],
-    )
-    # 去除合并后产生的 NULL 值
-    result_df = df_utils.replace_null(
-        merged_df,
-        col_name=["wins_count", "lose_count", "terminate_count"],
-        replace_value=0,
-    )
-
-    # 加上 year、 month、quarter 列
-    result_df = append_columns(
-        result_df,
-        {
-            "year": func.lit(year if year else -1),
-            "month": func.lit(month if month else -1),
-            "quarter": func.lit(quarter if quarter else -1),
-        },
-    )
-
-    return result_df
+    return res_df
 
 
-def bidding_amount(
-    df: DataFrame,
-    district_groupby: bool = True,
-    year: int = None,
-    month: int = None,
-    quarter: int = None,
-) -> DataFrame:
+def bidding_budget_situation(df: DataFrame) -> DataFrame:
     """
-    统计所有数据中 各地区的总预算、总花费的最大值、总值、平均值
+    统计所有数据中 各地区的总预算的最大值、总值、平均值
 
     +-------------+----------+----------+----------+----------+----------+----------+----+-----+-------+
     |district_code|amount_sum|amount_max|amount_avg|budget_sum|budget_max|budget_avg|year|month|quarter|
@@ -132,25 +112,10 @@ def bidding_amount(
 
     ----------
     :param df
-    :param district_groupby 是否对地区进行划分, False 为统计全广西的数据
-    :param year 指定的年
-    :param month 指定的月
-    :param quarter 指定的季度
     """
-    groupby_cols = [ProjectKey.DISTRICT_CODE]
 
-    if not groupby_cols:
-        df = df.withColumn(ProjectKey.DISTRICT_CODE, func.lit(0))
-
-    time_condition = df_utils.get_time_span_condition(
-        timestamp_col_name=ProjectKey.SCRAPE_TIMESTAMP,
-        year=year,
-        month=month,
-        quarter=quarter,
-    )
-    # 过滤出符合时间段的
-    if time_condition is not None:
-        df = df.filter(condition=time_condition)
+    amount_col = func.col(ProjectKey.TOTAL_AMOUNT)
+    budget_col = func.col(ProjectKey.TOTAL_BUDGET)
 
     # 拿到指定的数据
     df = df.select(
@@ -158,10 +123,7 @@ def bidding_amount(
         ProjectKey.TOTAL_AMOUNT,
         ProjectKey.TOTAL_BUDGET,
         ProjectKey.SCRAPE_TIMESTAMP,
-    )
-
-    amount_col = func.col(ProjectKey.TOTAL_AMOUNT)
-    budget_col = func.col(ProjectKey.TOTAL_BUDGET)
+    ).filter((amount_col >= 0) | (budget_col >= 0))
 
     # 过滤掉负数和Null的值
     df = df.withColumn(
@@ -172,24 +134,83 @@ def bidding_amount(
         func.when(budget_col.isNull(), 0).when(budget_col < 0, 0).otherwise(budget_col),
     )
 
-    # 统计数据：总值、最大值、平均值
-    result_df = df.groupby(groupby_cols).agg(
-        func.sum(ProjectKey.TOTAL_AMOUNT).alias("amount_sum"),
-        func.max(ProjectKey.TOTAL_AMOUNT).alias("amount_max"),
-        func.mean(ProjectKey.TOTAL_AMOUNT).alias("amount_avg"),
-        func.sum(ProjectKey.TOTAL_BUDGET).alias("budget_sum"),
-        func.max(ProjectKey.TOTAL_BUDGET).alias("budget_max"),
-        func.mean(ProjectKey.TOTAL_BUDGET).alias("budget_avg"),
-    )
+    # # 统计数据：总值、最大值、平均值
+    # result_df = df.groupby(groupby_cols).agg(
+    #     func.sum(ProjectKey.TOTAL_AMOUNT).alias("amount_sum"),
+    #     func.max(ProjectKey.TOTAL_AMOUNT).alias("amount_max"),
+    #     func.mean(ProjectKey.TOTAL_AMOUNT).alias("amount_avg"),
+    #     func.sum(ProjectKey.TOTAL_BUDGET).alias("budget_sum"),
+    #     func.max(ProjectKey.TOTAL_BUDGET).alias("budget_max"),
+    #     func.mean(ProjectKey.TOTAL_BUDGET).alias("budget_avg"),
+    # )
+    pass
+    # return result_df
 
-    # 加上 year、 month、quarter 列
-    result_df = append_columns(
-        result_df,
-        {
-            "year": func.lit(year if year else -1),
-            "month": func.lit(month if month else -1),
-            "quarter": func.lit(quarter if quarter else -1),
-        },
+
+def bidding_district_type(df: DataFrame) -> DataFrame:
+    """
+    地区类型个数：省级、市级、区级
+    +----------------+---------------+--------------+
+    |provincial_count|municipal_count|district_count|
+    +----------------+---------------+--------------+
+    |0               |177            |1532          |
+    +----------------+---------------+--------------+
+
+    """
+
+    district_code_col = func.col(ProjectKey.DISTRICT_CODE)
+    df = (
+        df.select(district_code_col.cast(IntegerType()), ProjectKey.SCRAPE_TIMESTAMP)
+        # 省级，等于 450000
+        .withColumn(
+            "provincial_level",
+            district_code_col == DevConstants.DISTRICT_CODE_GUANGXI,
+        )
+        # 市级，模100为0
+        .withColumn(
+            "municipal_level",
+            (district_code_col.__mod__(100) == 0)
+            & (district_code_col.__mod__(DevConstants.DISTRICT_CODE_GUANGXI) != 0),
+        )
+        # 区级：模100不为0
+        .withColumn("district_level", district_code_col.__mod__(100) != 0)
+    )
+    # 统计总个数
+    total_count = df.count()
+
+    provincial_df = (
+        df.filter(func.col("provincial_level"))
+        .groupby("provincial_level")
+        .agg(func.count("provincial_level").alias("provincial_count"))
+    ).drop("provincial_level")
+
+    if provincial_df.count() == 0:
+        provincial_df = dataframe_tools.create_dataframe(data=[{"provincial_count": 0}])
+
+    municipal_df = (
+        df.filter(func.col("municipal_level"))
+        .groupby("municipal_level")
+        .agg(func.count("municipal_level").alias("municipal_count"))
+    ).drop("municipal_level")
+
+    if municipal_df.count() == 0:
+        municipal_df = dataframe_tools.create_dataframe(data=[{"municipal_count": 0}])
+
+    district_df = (
+        df.filter(func.col("district_level"))
+        .groupby("district_level")
+        .agg(func.count("district_level").alias("district_count"))
+    ).drop("district_level")
+
+    if district_df.count() == 0:
+        district_df = dataframe_tools.create_dataframe(data=[{"district_count": 0}])
+
+    all_df = dataframe_tools.create_dataframe(data=[{"total_count": total_count}])
+
+    result_df = dataframe_tools.join_dataframes(
+        dfs=[provincial_df, municipal_df, district_df, all_df],
+        depend_on=None,
+        how_join="cross",
     )
 
     return result_df

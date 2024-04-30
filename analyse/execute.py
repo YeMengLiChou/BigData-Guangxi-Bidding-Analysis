@@ -1,3 +1,4 @@
+from analyse.core import supplier, transactions, methods, bidding
 from analyse.sinks.console import batch_to_console
 from config.config import settings
 from utils.spark_utils import SparkUtils
@@ -36,10 +37,17 @@ def transform_to_json(df: DataFrame) -> DataFrame:
 def execute():
     source = get_kafka_source()
     df = transform_to_json(source)
-    for i in range(len(dfs)):
-        dfs[i] = batch_to_console(dfs[i])
+    # for i in range(len(dfs)):
+    #     dfs[i] = batch_to_console(dfs[i])
 
     # batch_to_console(purchaser.purchaser_related_agency(df))
+    # batch_to_console(supplier.supplier_transactions_volume(df))
+    # batch_to_console(supplier.supplier_transactions_volume(df))
+    # batch_to_console(transactions.transactions_total_volume_all(df))
+    # batch_to_console(transactions.transactions_total_volume(df, False, 2022, 4))
+    # batch_to_console(methods.procurement_method_count(df))
+    # batch_to_console(bidding.bidding_result(df))
+    batch_to_console(bidding.bidding_district_type(df))
 
 
 if __name__ == "__main__":
