@@ -3,7 +3,7 @@ import router from "./router";
 import { setupStore } from "@/store";
 import { getPlatformConfig } from "./config";
 import { MotionPlugin } from "@vueuse/motion";
-// import { useEcharts } from "@/plugins/echarts";
+import { useEcharts } from "@/plugins/echarts";
 import { createApp, type Directive } from "vue";
 import { useElementPlus } from "@/plugins/elementPlus";
 import { injectResponsiveStorage } from "@/utils/responsive";
@@ -50,13 +50,18 @@ import "tippy.js/themes/light.css";
 import VueTippy from "vue-tippy";
 app.use(VueTippy);
 
+
+// 全局 echarts
+import * as echarts from "echarts";
+app.config.globalProperties.$echarts = echarts;
+
+
 getPlatformConfig(app).then(async config => {
   setupStore(app);
   app.use(router);
   await router.isReady();
   injectResponsiveStorage(app, config);
-  app.use(MotionPlugin).use(useElementPlus).use(Table);
+  app.use(MotionPlugin).use(useElementPlus).use(Table).use(useEcharts);;
   // .use(PureDescriptions)
-  // .use(useEcharts);
   app.mount("#app");
 });
