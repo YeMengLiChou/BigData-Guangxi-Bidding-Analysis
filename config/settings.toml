@@ -1,14 +1,36 @@
+# 调试用
+[debug]
+enable = true
+#enable = false
+
+
+# ======================== redis配置 ==========================
 [redis]
 host = "127.0.0.1"
 port = 6379
 db = 0
 
 
+# ========================== mysql 配置 ========================
+[mysql]
+host = "172.27.224.1"
+port = 3306
+database = "bidding"
+user = "root"
+password = "suweikai"
+batchSize = 10000
+isolationLevel = "NONE"
+
+
+# ====================== 爬虫配置 ================================
 [scrapy]
+# 开始日期
 publish_date_begin=[2023, 1, 1]
+# 结束日期
 publish_date_end=[2023, 1, 30]
 
-# ====================== scrapy.settings ======================
+
+# ====================== scrapy/settings.py ======================
 [scrapy.settings]
 # 并发请求数
 CONCURRENT_REQUESTS=16
@@ -31,8 +53,10 @@ AUTOTHROTTLE_START_DELAY=2
 # 最大延迟
 AUTOTHROTTLE_MAX_DELAY=10
 
-#
+
+# ==================== scrapy 日志设置 =============================
 [scrapy.log]
+# 日志级别
 LOG_LEVEL = "INFO"
 # LOG_FILE =  "logs/collect/out.log"
 # size / time
@@ -47,6 +71,7 @@ LOG_FILE_INTERVAL = 4
 LOG_FILE_ROTATION_UNIT = "hour"
 
 
+# ======================  kafka 总体配置 ============================
 [kafka]
 host = "172.27.237.77"  # wsl
 #host = "172.17.160.199" # aliyun
@@ -54,12 +79,12 @@ port = 9092
 
 
 [kafka.scrapy]
+# 爬取的item发送的主题
 topic="scrapy_data_test"
 key="an"
 
+
 [kafka.spark]
+# spark 读取kafka的主题
 topic="scrapy_data_2"
 
-[debug]
-enable = true
-#enable = false
