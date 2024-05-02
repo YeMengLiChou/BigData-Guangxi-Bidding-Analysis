@@ -88,5 +88,5 @@ def dumps_to_console(content: str):
 
 
 if __name__ == "__main__":
-    dumps_to_console(content=load_from_json(json_path="./../logs/server-log2/parse_errors.json1"))
+    dumps_to_console(content=load_from_json(json_path="../logs/server3/parse_errors.json"))
     # print(1 / 0)
