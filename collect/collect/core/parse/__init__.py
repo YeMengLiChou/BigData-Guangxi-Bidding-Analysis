@@ -201,6 +201,7 @@ class AbstractFormatParser:
                 elif ll[l_idx] == rp:
                     ok = False
                     break
+                l_idx -= 1
             if ok:
                 while r_idx < r_len:
                     if rr[r_idx] == rp:
