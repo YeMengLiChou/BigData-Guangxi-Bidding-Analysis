@@ -4,8 +4,9 @@ from typing import Union, Callable
 
 from lxml import etree
 
+import utils.debug_stats
 from collect.collect.middlewares import ParseError
-from utils import symbol_tools as sym
+from utils import symbol_tools as sym, log
 from utils import debug_stats as stats
 from constants import (
     ProjectKey,
@@ -317,7 +318,7 @@ def parse_review_experts(part: list[str]) -> dict:
         if l != -1 and r != -1:
             # 名字在括号的右边：（xxx）名字
             if l == 0:
-                result = p[r + 1 :]
+                result = p[r + 1:]
             # 名字在括号的左边： 名字（xxx）
             elif r == len(p) - 1:
                 result = p[:l]
@@ -374,7 +375,7 @@ def get_template_bid_item(is_win: bool, index: int, name: str = None) -> dict:
 
 
 PATTERN_PURCHASER = re.compile(
-    r"(?:采购|征集|招标)人(?:信息|)(?:\S*?名称\S*?)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
+    r"(?:采购|釆购|征集|招标)人(?:信息|)(?:\S*?名称\S*?)?[:：](\S+?)(?:地址|联系人|联系方式)[:：]"
 )
 
 PATTERN_PURCHASER_AGENCY = re.compile(
@@ -403,25 +404,12 @@ def parse_contact_info(part: str) -> dict:
     else:
         data[ProjectKey.PURCHASER_AGENCY] = None
 
-    if data[ProjectKey.PURCHASER] is None or data[ProjectKey.PURCHASER_AGENCY] is None:
-        # 某些只有一个名称
-        if part.count("名称") == 1:
-            return data
-        raise ParseError(
-            msg="出现新的联系方式内容",
-            content=[
-                f"purchaser 解析结果:{data[ProjectKey.PURCHASER]}",
-                f"agency 解析结果:{data[ProjectKey.PURCHASER_AGENCY]}",
-                part,
-            ],
-        )
-
     return data
 
 
 @stats.function_stats(logger)
 def _merge_bid_items(
-    _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
+        _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
 ) -> list:
     """
     将两部分的标项信息合并
@@ -519,6 +507,19 @@ def calculate_total_budget(bid_items: list):
 keys = []
 # 排除的key，需要单独设置
 exclude_keys = [ProjectKey.TOTAL_BUDGET, ProjectKey.TOTAL_AMOUNT]
+
+if utils.debug_stats.DEBUG_STATUS:
+    exclude_keys += [
+        ProjectKey.ANNOUNCEMENT_TYPE,
+        ProjectKey.RESULT_PUBLISH_DATE,
+        ProjectKey.AUTHOR,
+        ProjectKey.DISTRICT_CODE,
+        ProjectKey.CATALOG,
+        ProjectKey.PROCUREMENT_METHOD,
+        ProjectKey.BID_OPENING_TIME,
+        ProjectKey.IS_TERMINATION,
+        ProjectKey.TERMINATION_REASON,
+    ]
 for _k, v in vars(ProjectKey).items():
     if _k.isupper() and v not in exclude_keys:
         keys.append(v)
@@ -541,61 +542,74 @@ def make_item(result_data: dict, purchase_data: Union[dict, None]):
                 ProjectKey.BID_ITEMS, []
             )
         else:
-            # 合并标项
-            purchase_bid_items = purchase_data.pop(ProjectKey.BID_ITEMS, [])
-            result_bid_items = result_data.get(ProjectKey.BID_ITEMS, [])
-            result_data[ProjectKey.BID_ITEMS] = _merge_bid_items(
-                _purchase=purchase_bid_items,
-                _result=result_bid_items,
-                cancel_reason_only_one=result_data.get(
-                    CollectDevKey.BIDDING_CANCEL_REASON_ONLY_ONE, False
-                ),
-                data=result_data,
-            )
+            # 采购公告存在特殊格式，没有标项信息，不进行合并
+            if not purchase_data.get(CollectDevKey.PURCHASE_SPECIAL_FORMAT_1, False):
+                # 合并标项
+                purchase_bid_items = purchase_data.pop(ProjectKey.BID_ITEMS, [])
+                result_bid_items = result_data.get(ProjectKey.BID_ITEMS, [])
+                result_data[ProjectKey.BID_ITEMS] = _merge_bid_items(
+                    _purchase=purchase_bid_items,
+                    _result=result_bid_items,
+                    cancel_reason_only_one=result_data.get(
+                        CollectDevKey.BIDDING_CANCEL_REASON_ONLY_ONE, False
+                    ),
+                    data=result_data,
+                )
+            else:
+                # 删除空的列表，防止下面update时覆盖
+                purchase_data.pop(ProjectKey.BID_ITEMS)
         result_data.update(purchase_data)
 
     # 从 data 中取出所需要的信息
     item = {k: result_data[k] for k in keys}
 
-    # TODO： 设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
-    if not item[ProjectKey.DISTRICT_CODE]:
-        raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))
+    # TODO：设置广西值，如果没有设置默认为广西，或者尝试从标题中解析出来
+    if not utils.debug_stats.DEBUG_STATUS:
+        if not item[ProjectKey.DISTRICT_CODE]:
+            raise ParseError(msg="项目地区编号不能为空", content=list(item.items()))
 
-    # 项目总预算
-    total_budget = result_data.get(ProjectKey.TOTAL_BUDGET, None)
-    calculated_budget = calculate_total_budget(
-        bid_items=result_data[ProjectKey.BID_ITEMS]
-    )
-    # 如果项目总预算存在，则需要和计算后的预算进行对比
-    if total_budget:
-        if abs(calculated_budget - total_budget) > 1e-5:
-            raise ParseError(
-                msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致（误差大于1e-5）",
-                content=result_data[ProjectKey.BID_ITEMS],
-            )
+    # 如果采购公告能拿到标项的预算，那么进行计算验证
+    if not result_data.get(CollectDevKey.PURCHASE_SPECIAL_FORMAT_1, False):
+        # 项目总预算
+        total_budget = result_data.get(ProjectKey.TOTAL_BUDGET, None)
+        calculated_budget = calculate_total_budget(
+            bid_items=result_data[ProjectKey.BID_ITEMS]
+        )
+        # 如果项目总预算存在，则需要和计算后的预算进行对比
+        if total_budget:
+            if abs(calculated_budget - total_budget) > 1e-5:
+                raise ParseError(
+                    msg=f"项目总预算: {total_budget} 与计算后的预算: {calculated_budget} 不一致（误差大于1e-5）",
+                    content=result_data[ProjectKey.BID_ITEMS],
+                )
+            else:
+                item[ProjectKey.TOTAL_BUDGET] = calculated_budget
         else:
             item[ProjectKey.TOTAL_BUDGET] = calculated_budget
     else:
-        item[ProjectKey.TOTAL_BUDGET] = calculated_budget
+        item[ProjectKey.TOTAL_BUDGET] = result_data[ProjectKey.TOTAL_BUDGET]
 
     # 计算总金额
     if item[ProjectKey.IS_WIN_BID]:
+        budget = item[ProjectKey.TOTAL_BUDGET]
         item[ProjectKey.TOTAL_AMOUNT] = calculate_total_amount(
             bid_items=item[ProjectKey.BID_ITEMS],
-            budget=item[ProjectKey.TOTAL_BUDGET],
+            budget=budget if budget > 0 else 0,
         )
     else:
         item[ProjectKey.TOTAL_AMOUNT] = 0
 
+    if utils.debug_stats.DEBUG_STATUS:
+        log.json(logger.info, item)
     return item
 
 
 @stats.function_stats(logger, log_params=True)
 def split_content_by_titles(
-    result: list[str],
-    is_win_bid: bool,
-    check_title: Callable[[bool, str], int],
-    rfind: bool = False,
+        result: list[str],
+        is_win_bid: bool,
+        check_title: Callable[[bool, str], int],
+        rfind: bool = False,
 ) -> dict[int, list[str]]:
     """
     根据标题来分片段
@@ -639,7 +653,7 @@ def split_content_by_titles(
                         length += len(result[idx])
                     else:
                         # 拼接
-                        result[idx] = "".join(result[tmp_idx : idx + 1])
+                        result[idx] = "".join(result[tmp_idx: idx + 1])
                         completed = True
 
             # 存在一种情况，“中文数字、”和后面的标题内容分开，也就是 '、' 是最后一个字符
@@ -667,12 +681,12 @@ def split_content_by_titles(
                     continue
                 # 某些标题可能和后面的内容连成一块，需要分开
                 if symbol := sym.get_symbol(
-                    result[idx], (":", "："), raise_error=False
+                        result[idx], (":", "："), raise_error=False
                 ):
                     sym_idx = result[idx].index(symbol)
                     # 如果冒号不是最后一个字符
                     if sym_idx < len(result[idx]) - 1:
-                        result.insert(idx + 1, result[idx][sym_idx + 1 :])
+                        result.insert(idx + 1, result[idx][sym_idx + 1:])
                         n += 1
 
                 # 开始部分(不记入标题）
@@ -681,27 +695,27 @@ def split_content_by_titles(
                 # 正向查找
                 if not rfind:
                     while idx < n and (
-                        # 单个中文
-                        translate_zh_to_number(result[idx]) < chinese_number_index + 1
-                        and (  # 不以 ‘中文数字、’ 开头
-                            (zh_idx := startswith_chinese_number(result[idx])) == -1
-                            or
-                            # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
-                            zh_idx < chinese_number_index + 1
-                        )
+                            # 单个中文
+                            translate_zh_to_number(result[idx]) < chinese_number_index + 1
+                            and (  # 不以 ‘中文数字、’ 开头
+                                    (zh_idx := startswith_chinese_number(result[idx])) == -1
+                                    or
+                                    # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                                    zh_idx < chinese_number_index + 1
+                            )
                     ):
                         idx += 1
                 else:
                     r_idx = n - 1
                     while r_idx > idx and (
-                        # 单个中文
-                        translate_zh_to_number(result[r_idx]) > chinese_number_index + 1
-                        and (  # 不以 ‘中文数字、’ 开头
-                            (zh_idx := startswith_chinese_number(result[r_idx])) == -1
-                            or
-                            # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
-                            zh_idx > chinese_number_index + 1
-                        )
+                            # 单个中文
+                            translate_zh_to_number(result[r_idx]) > chinese_number_index + 1
+                            and (  # 不以 ‘中文数字、’ 开头
+                                    (zh_idx := startswith_chinese_number(result[r_idx])) == -1
+                                    or
+                                    # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                                    zh_idx > chinese_number_index + 1
+                            )
                     ):
                         r_idx -= 1
                     idx = r_idx + 1
@@ -712,3 +726,22 @@ def split_content_by_titles(
         else:
             idx += 1
     return parts
+
+
+def make_bid_item_with_no_data(data: dict) -> dict:
+    """
+    生成没有采购和成交公告数据的item
+    :param data:
+    :return:
+    """
+    item = {}
+    for key in data:
+        if key not in data:
+            item[key] = None
+        else:
+            item[key] = data[key]
+
+    item[ProjectKey.BID_ITEMS] = []
+    item[ProjectKey.TOTAL_BUDGET] = -1
+    item[ProjectKey.TOTAL_AMOUNT] = -1
+    return item

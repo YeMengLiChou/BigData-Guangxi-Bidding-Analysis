@@ -134,7 +134,7 @@ def create_topic(topic: str):
     return response.topic_errors[0][1] == 0  # verify error code
 
 
-def send_item_to_kafka(item: Union[dict, str]) -> bool:
+def send_item_to_kafka(item: Union[dict, str]):
     """
     发送 item 数据到 kafka 队列中
     :param item:
@@ -149,15 +149,24 @@ def send_item_to_kafka(item: Union[dict, str]) -> bool:
         value = item
     else:
         raise TypeError("item must be dict or str")
-    # response 为 future 类型，需要 get 后才能知道是否成功响应
-    response = _producer.send(
+    # send to kafka
+    _producer.send(
         _config["topic"],
         value=value,
         key=_config["key"],
         timestamp_ms=time.now_timestamp(),
     )
-    response.get()
-    return response.succeeded()
+    # it will block the application when kafka-server closed connections
+    # response.get()
+    # return response.succeeded()
+
+
+def flush_to_kafka():
+    """
+    将buffer中的消息全部输出到 kafka
+    :return:
+    """
+    _producer.flush(timeout=10 * 000)
 
 
 if __name__ == "__main__":

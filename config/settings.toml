@@ -3,18 +3,63 @@ host = "127.0.0.1"
 port = 6379
 db = 0
 
+
+[scrapy]
+publish_date_begin=[2023, 1, 1]
+publish_date_end=[2023, 1, 30]
+
+# ====================== scrapy.settings ======================
+[scrapy.settings]
+# 并发请求数
+CONCURRENT_REQUESTS=16
+# 请求间隔
+DOWNLOAD_DELAY=0.2
+# 请求超时
+DOWNLOAD_TIMEOUT=20
+# item并发数
+CONCURRENT_ITEMS=64
+# 请求并发数
+CONCURRENT_REQUESTS_PER_DOMAIN=16
+# 重试次数
+RETRY_TIMES = 5
+# 最大线程池大小
+REACTOR_THREADPOOL_MAXSIZE = 16
+# 自动调节
+AUTOTHROTTLE_ENABLED=true
+# 下载延迟
+AUTOTHROTTLE_START_DELAY=2
+# 最大延迟
+AUTOTHROTTLE_MAX_DELAY=10
+
+#
+[scrapy.log]
+LOG_LEVEL = "INFO"
+# LOG_FILE =  "logs/collect/out.log"
+# size / time
+LOG_FILE_TYPE = "time"
+# 最大保留个数
+LOG_FILE_BACKUP_COUNT = 50
+# 最大文件大小，当 ``LOG_FILE_TYPE`` 设置为 size 生效
+# LOG_FILE_MAX_BYTES = 5 * 1024 * 1024
+# 生成文件间隔，单位为 ``LOG_FILE_ROTATION``，当 ``LOG_FILE_TYPE`` 设置为 time 生效
+LOG_FILE_INTERVAL = 4
+# 日志文件生成间隔单位：second / minute / hour / day /
+LOG_FILE_ROTATION_UNIT = "hour"
+
+
 [kafka]
 host = "172.27.237.77"  # wsl
 #host = "172.17.160.199" # aliyun
 port = 9092
 
+
 [kafka.scrapy]
-topic="scrapy_data_1"
+topic="scrapy_data_test"
 key="an"
 
 [kafka.spark]
 topic="scrapy_data_2"
 
 [debug]
-#enable = true
-enable = false
+enable = true
+#enable = false
