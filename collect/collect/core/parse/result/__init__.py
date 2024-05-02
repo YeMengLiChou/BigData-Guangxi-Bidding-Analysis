@@ -82,6 +82,9 @@ def parse_response_data(data: list):
             is_win, is_termination = False, True
 
         result_api_meta = {
+            ProjectKey.TITLE: item['title'],
+
+            ProjectKey.PURCHASE_TITLE: None,
             # 爬取的时间戳
             ProjectKey.SCRAPE_TIMESTAMP: item["publishDate"],
             # 公告类型
@@ -94,6 +97,14 @@ def parse_response_data(data: list):
             ProjectKey.AUTHOR: item["author"],
             # 地区编号（可能为空）
             ProjectKey.DISTRICT_CODE: item["districtCode"],
+            # 地区名称（可能为空）
+            ProjectKey.DISTRICT_NAME: item["districtName"],
+            # article_id
+            ProjectKey.PURCHASE_ARTICLE_ID: item["articleId"],
+            # source_article_id
+            ProjectKey.RESULT_SOURCE_ARTICLE_ID: item["articleId"],
+            # source_purchase_article_id
+            ProjectKey.PURCHASE_SOURCE_ARTICLE_ID: None,
             # 采购物品名称
             ProjectKey.CATALOG: item["gpCatalogName"],
             # 采购方式

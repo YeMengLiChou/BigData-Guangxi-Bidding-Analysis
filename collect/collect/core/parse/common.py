@@ -318,7 +318,7 @@ def parse_review_experts(part: list[str]) -> dict:
         if l != -1 and r != -1:
             # 名字在括号的右边：（xxx）名字
             if l == 0:
-                result = p[r + 1 :]
+                result = p[r + 1:]
             # 名字在括号的左边： 名字（xxx）
             elif r == len(p) - 1:
                 result = p[:l]
@@ -409,7 +409,7 @@ def parse_contact_info(part: str) -> dict:
 
 @stats.function_stats(logger)
 def _merge_bid_items(
-    _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
+        _purchase: list, _result: list, cancel_reason_only_one: bool, data: dict
 ) -> list:
     """
     将两部分的标项信息合并
@@ -606,10 +606,10 @@ def make_item(result_data: dict, purchase_data: Union[dict, None]):
 
 @stats.function_stats(logger, log_params=True)
 def split_content_by_titles(
-    result: list[str],
-    is_win_bid: bool,
-    check_title: Callable[[bool, str], int],
-    rfind: bool = False,
+        result: list[str],
+        is_win_bid: bool,
+        check_title: Callable[[bool, str], int],
+        rfind: bool = False,
 ) -> dict[int, list[str]]:
     """
     根据标题来分片段
@@ -653,7 +653,7 @@ def split_content_by_titles(
                         length += len(result[idx])
                     else:
                         # 拼接
-                        result[idx] = "".join(result[tmp_idx : idx + 1])
+                        result[idx] = "".join(result[tmp_idx: idx + 1])
                         completed = True
 
             # 存在一种情况，“中文数字、”和后面的标题内容分开，也就是 '、' 是最后一个字符
@@ -681,12 +681,12 @@ def split_content_by_titles(
                     continue
                 # 某些标题可能和后面的内容连成一块，需要分开
                 if symbol := sym.get_symbol(
-                    result[idx], (":", "："), raise_error=False
+                        result[idx], (":", "："), raise_error=False
                 ):
                     sym_idx = result[idx].index(symbol)
                     # 如果冒号不是最后一个字符
                     if sym_idx < len(result[idx]) - 1:
-                        result.insert(idx + 1, result[idx][sym_idx + 1 :])
+                        result.insert(idx + 1, result[idx][sym_idx + 1:])
                         n += 1
 
                 # 开始部分(不记入标题）
@@ -695,27 +695,27 @@ def split_content_by_titles(
                 # 正向查找
                 if not rfind:
                     while idx < n and (
-                        # 单个中文
-                        translate_zh_to_number(result[idx]) < chinese_number_index + 1
-                        and (  # 不以 ‘中文数字、’ 开头
-                            (zh_idx := startswith_chinese_number(result[idx])) == -1
-                            or
-                            # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
-                            zh_idx < chinese_number_index + 1
-                        )
+                            # 单个中文
+                            translate_zh_to_number(result[idx]) < chinese_number_index + 1
+                            and (  # 不以 ‘中文数字、’ 开头
+                                    (zh_idx := startswith_chinese_number(result[idx])) == -1
+                                    or
+                                    # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                                    zh_idx < chinese_number_index + 1
+                            )
                     ):
                         idx += 1
                 else:
                     r_idx = n - 1
                     while r_idx > idx and (
-                        # 单个中文
-                        translate_zh_to_number(result[r_idx]) > chinese_number_index + 1
-                        and (  # 不以 ‘中文数字、’ 开头
-                            (zh_idx := startswith_chinese_number(result[r_idx])) == -1
-                            or
-                            # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
-                            zh_idx > chinese_number_index + 1
-                        )
+                            # 单个中文
+                            translate_zh_to_number(result[r_idx]) > chinese_number_index + 1
+                            and (  # 不以 ‘中文数字、’ 开头
+                                    (zh_idx := startswith_chinese_number(result[r_idx])) == -1
+                                    or
+                                    # 以 ‘中文数字、’ 开头，但是小于当前的 index + 1
+                                    zh_idx > chinese_number_index + 1
+                            )
                     ):
                         r_idx -= 1
                     idx = r_idx + 1
@@ -726,3 +726,22 @@ def split_content_by_titles(
         else:
             idx += 1
     return parts
+
+
+def make_bid_item_with_no_data(data: dict) -> dict:
+    """
+    生成没有采购和成交公告数据的item
+    :param data:
+    :return:
+    """
+    item = {}
+    for key in data:
+        if key not in data:
+            item[key] = None
+        else:
+            item[key] = data[key]
+
+    item[ProjectKey.BID_ITEMS] = []
+    item[ProjectKey.TOTAL_BUDGET] = -1
+    item[ProjectKey.TOTAL_AMOUNT] = -1
+    return item

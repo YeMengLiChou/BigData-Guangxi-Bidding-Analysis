@@ -181,7 +181,9 @@ class BiddingSpider(scrapy.Spider):
         begin = getattr(settings, "scrapy.publish_date_begin", [2022, 1, 1])
         end = getattr(settings, "scrapy.publish_date_end", [2022, 1, 30])
 
-        self.publish_date_begin = datetime.datetime(year=begin[0], month=begin[1], day=begin[2])
+        self.publish_date_begin = datetime.datetime(
+            year=begin[0], month=begin[1], day=begin[2]
+        )
         self.publish_date_end = datetime.datetime(year=end[0], month=end[1], day=end[2])
         logging.info(
             f"Ensured span:\n"
@@ -191,7 +193,9 @@ class BiddingSpider(scrapy.Spider):
         )
         self.debug = False
 
-        module = importlib.import_module("collect.collect.spiders.filtered_error_articles")
+        module = importlib.import_module(
+            "collect.collect.spiders.filtered_error_articles"
+        )
         if ids := getattr(module, "ids", None):
             redis.add_unique_article_ids(ids)
             logger.info(f"fetch {len(ids)} records to filter!")
@@ -283,14 +287,14 @@ class BiddingSpider(scrapy.Spider):
 
     @stats.function_stats(logger)
     def _make_result_request(
-            self,
-            page_no: int,
-            page_size: int,
-            publish_date_begin: str,
-            publish_date_end: str,
-            callback: callable,
-            dont_filter: bool = False,
-            priority: int = 0,
+        self,
+        page_no: int,
+        page_size: int,
+        publish_date_begin: str,
+        publish_date_end: str,
+        callback: callable,
+        dont_filter: bool = False,
+        priority: int = 0,
     ):
         """
         生成结果列表的请求
@@ -347,13 +351,13 @@ class BiddingSpider(scrapy.Spider):
             priority_start = -10000
             # 因为api最多只能检索到1w条数据，因此不能一次性选择很大的时间范围，这里选择拆分为一个月的时间跨度
             for year in range(
-                    self.publish_date_begin.year, self.publish_date_end.year + 1
+                self.publish_date_begin.year, self.publish_date_end.year + 1
             ):
                 for month in range(1, 13):
                     # 跳过超出时间范围的
                     if (
-                            year == self.publish_date_end.year
-                            and month > self.publish_date_end.month
+                        year == self.publish_date_end.year
+                        and month > self.publish_date_end.month
                     ):
                         continue
 
@@ -481,15 +485,25 @@ class BiddingSpider(scrapy.Spider):
                     meta[ProjectKey.NAME] = data["projectName"]
                     title = data["title"]
 
+                    # 如果不匹配，那么来源数据的id需要改为当前的id
+                    article_id = get_article_id_from_url(response.url)
+                    if article_id != meta[ProjectKey.RESULT_SOURCE_ARTICLE_ID]:
+                        meta[ProjectKey.RESULT_SOURCE_ARTICLE_ID] = article_id
+                        meta[ProjectKey.TITLE] = title
+
                     # 公开征集公告省略
-                    if "公开征集" in title:
-                        logger.warning(f"该公告为征集公告，跳过 title: `{title}`")
+                    if "公开征集" in title and "中标候选" in title:
+                        logger.warning(
+                            f"该公告为征集公告或中标候选 ，跳过 title: `{title}`"
+                        )
+                        # 生成部分信息的item
+                        yield common.make_bid_item_with_no_data(meta)
                         return
 
                     if title and ("中标候选人" in title):
                         meta[CollectDevKey.RESULT_CONTAINS_CANDIDATE] = True
 
-                    if ProjectKey.DISTRICT_CODE not in meta:
+                    if meta.get(ProjectKey.DISTRICT_CODE, None) is None:
                         meta[ProjectKey.DISTRICT_CODE] = data["districtCode"]
 
                     # 解析其他公告
@@ -499,7 +513,7 @@ class BiddingSpider(scrapy.Spider):
 
                     # 判断是否为所需要的结果公告
                     if data["announcementType"] and common.check_unuseful_announcement(
-                            data["announcementType"]
+                        data["announcementType"]
                     ):
                         raise SwitchError("该结果公告并非所需要的")
 
@@ -659,6 +673,12 @@ class BiddingSpider(scrapy.Spider):
                     parsed |= 1 << index
                     meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID] = parsed
 
+                # 如果不匹配，那么来源数据的id需要改为当前的id
+                article_id = get_article_id_from_url(response.url)
+                if article_id != meta[ProjectKey.PURCHASE_SOURCE_ARTICLE_ID]:
+                    meta[ProjectKey.PURCHASE_SOURCE_ARTICLE_ID] = article_id
+                    meta[ProjectKey.PURCHASE_TITLE] = data['title']
+
                 # 某些文章id返回的数据为None，需要预选处理
                 if data is None:
                     logger.warning(
@@ -678,7 +698,7 @@ class BiddingSpider(scrapy.Spider):
                 try:
                     # 更新 html 内容
                     purchase_data = purchase.parse_html(html_content=data["content"])
-                except ParseError as e:
+                except ParseError:
                     yield self.switch_other_purchase_announcement(meta=meta)
                     return
 
@@ -688,6 +708,7 @@ class BiddingSpider(scrapy.Spider):
                 logger.warning("采购公告没有标项信息")
                 yield self.switch_other_purchase_announcement(meta=meta)
                 return None
+
             except BaseException as e:
                 errorhandle.raise_error(
                     e,

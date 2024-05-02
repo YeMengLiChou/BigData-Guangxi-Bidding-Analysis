@@ -2,6 +2,15 @@ class ProjectKey:
     """
     项目的key
     """
+    TITLE = "title"
+    """
+    公告-标题
+    """
+
+    PURCHASE_TITLE = "purchase_title"
+    """
+    项目-采购公告的标题
+    """
 
     SCRAPE_TIMESTAMP = "scrape_timestamp"
     """
@@ -43,6 +52,11 @@ class ProjectKey:
     项目-项目所在行政区划代码
     """
 
+    DISTRICT_NAME = "district_name"
+    """
+    项目-项目所在行政区名称
+    """
+
     CATALOG = "catalog"
     """
     项目-项目采购所属种类
@@ -71,6 +85,16 @@ class ProjectKey:
     RESULT_PUBLISH_DATE = "result_publish_date"
     """
     项目-结果公告发布日期
+    """
+
+    RESULT_SOURCE_ARTICLE_ID = "result_source_article_id"
+    """
+    项目-数据来源采购公告
+    """
+
+    PURCHASE_SOURCE_ARTICLE_ID = "purchase_source_article_id"
+    """
+    项目-数据来源采购公告
     """
 
     RESULT_ARTICLE_ID = "result_article_id"
