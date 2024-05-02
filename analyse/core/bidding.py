@@ -159,8 +159,13 @@ def bidding_district_type(df: DataFrame) -> DataFrame:
     """
 
     district_code_col = func.col(ProjectKey.DISTRICT_CODE)
+    total_amount_col = func.col(ProjectKey.TOTAL_AMOUNT)
     df = (
-        df.select(district_code_col.cast(IntegerType()), ProjectKey.SCRAPE_TIMESTAMP)
+        df.select(
+            district_code_col.cast(IntegerType()),
+            ProjectKey.SCRAPE_TIMESTAMP,
+            ProjectKey.TOTAL_AMOUNT,
+        )
         # 省级，等于 450000
         .withColumn(
             "provincial_level",
@@ -173,15 +178,26 @@ def bidding_district_type(df: DataFrame) -> DataFrame:
             & (district_code_col.__mod__(DevConstants.DISTRICT_CODE_GUANGXI) != 0),
         )
         # 区级：模100不为0
-        .withColumn("district_level", district_code_col.__mod__(100) != 0)
+        .withColumn("district_level", district_code_col.__mod__(100) != 0).withColumn(
+            ProjectKey.TOTAL_AMOUNT,
+            func.when(
+                (total_amount_col.isNull() | (total_amount_col < 0)), 0
+            ).otherwise(total_amount_col),
+        )
     )
     # 统计总个数
     total_count = df.count()
+    total_df = df.agg(
+        func.sum(ProjectKey.TOTAL_AMOUNT).alias("total_amount")
+    ).withColumn("total_count", func.lit(total_count))
 
     provincial_df = (
         df.filter(func.col("provincial_level"))
         .groupby("provincial_level")
-        .agg(func.count("provincial_level").alias("provincial_count"))
+        .agg(
+            func.count("provincial_level").alias("provincial_count"),
+            func.sum(ProjectKey.TOTAL_AMOUNT).alias("provincial_amount"),
+        )
     ).drop("provincial_level")
 
     if provincial_df.count() == 0:
@@ -190,7 +206,10 @@ def bidding_district_type(df: DataFrame) -> DataFrame:
     municipal_df = (
         df.filter(func.col("municipal_level"))
         .groupby("municipal_level")
-        .agg(func.count("municipal_level").alias("municipal_count"))
+        .agg(
+            func.count("municipal_level").alias("municipal_count"),
+            func.sum(ProjectKey.TOTAL_AMOUNT).alias("municipal_amount"),
+        )
     ).drop("municipal_level")
 
     if municipal_df.count() == 0:

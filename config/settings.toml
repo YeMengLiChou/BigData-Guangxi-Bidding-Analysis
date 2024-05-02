@@ -13,7 +13,7 @@ topic="scrapy_data_1"
 key="an"
 
 [kafka.spark]
-topic="scrapy_data_test"
+topic="scrapy_data_2"
 
 [debug]
 #enable = true

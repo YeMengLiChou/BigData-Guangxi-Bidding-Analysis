@@ -37,13 +37,13 @@ def _init_config():
         _config["topic"] = getattr(settings, "kafka.scrapy.topic", None)
         _config["key"] = getattr(settings, "kafka.scrapy.key", None)
 
-    if _config['host'] is None:
+    if _config["host"] is None:
         raise ValueError("kafka.host is not set in settings.toml")
 
-    if _config['port'] is None:
+    if _config["port"] is None:
         raise ValueError("kafka.port is not set in settings.toml")
 
-    if _config['topic'] is None:
+    if _config["topic"] is None:
         raise ValueError("kafka.scrapy.topic is not set in settings.toml")
 
     logger.info(

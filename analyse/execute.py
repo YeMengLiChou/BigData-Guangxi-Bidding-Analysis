@@ -46,8 +46,8 @@ def execute():
     # batch_to_console(transactions.transactions_total_volume_all(df))
     # batch_to_console(transactions.transactions_total_volume(df, False, 2022, 4))
     # batch_to_console(methods.procurement_method_count(df))
-    # batch_to_console(bidding.bidding_result(df))
-    batch_to_console(bidding.bidding_district_type(df))
+    batch_to_console(bidding.bidding_result(df))
+    # batch_to_console(bidding.bidding_district_type(df))
 
 
 if __name__ == "__main__":
