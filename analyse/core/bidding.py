@@ -63,24 +63,25 @@ def bidding_result(
     ----------
     :param df
     """
-
-    df = df.select(
-        ProjectKey.DISTRICT_CODE,
-        ProjectKey.SCRAPE_TIMESTAMP,
-        ProjectKey.IS_WIN_BID,
-        ProjectKey.IS_TERMINATION,
-    )
     win_df = __win_bidding_result(
         df.select(
             ProjectKey.DISTRICT_CODE, ProjectKey.SCRAPE_TIMESTAMP, ProjectKey.IS_WIN_BID
         )
     )
     lose_df = __lose_bidding_result(
-        df.withColumn(
+        df.select(
+            ProjectKey.DISTRICT_CODE,
+            ProjectKey.SCRAPE_TIMESTAMP,
+            ProjectKey.IS_WIN_BID,
+            ProjectKey.IS_TERMINATION,
+        )
+        .withColumn(
             "is_lose_bid",
             (~func.col(ProjectKey.IS_WIN_BID)) & (~func.col(ProjectKey.IS_TERMINATION)),
-        ).select(ProjectKey.DISTRICT_CODE, ProjectKey.SCRAPE_TIMESTAMP, "is_lose_bid")
+        )
+        .select(ProjectKey.DISTRICT_CODE, ProjectKey.SCRAPE_TIMESTAMP, "is_lose_bid")
     )
+
     terminate_df = __terminate_bidding_result(
         df.select(
             ProjectKey.DISTRICT_CODE,
@@ -92,7 +93,7 @@ def bidding_result(
     res_df = dataframe_tools.join_dataframes(
         dfs=[win_df, lose_df, terminate_df],
         depend_on=[ProjectKey.DISTRICT_CODE, "year", "month", "day", "quarter"],
-        how_join="outer",
+        how_join="left_outer",
     )
 
     res_df = dataframe_tools.replace_null(
@@ -166,7 +167,7 @@ def bidding_district_type(df: DataFrame) -> DataFrame:
             ProjectKey.SCRAPE_TIMESTAMP,
             ProjectKey.TOTAL_AMOUNT,
         )
-        # 省级，等于 450000
+        # 省级，等于 GUANGXI_DISTRICT_CODE
         .withColumn(
             "provincial_level",
             district_code_col == DevConstants.DISTRICT_CODE_GUANGXI,
@@ -174,8 +175,11 @@ def bidding_district_type(df: DataFrame) -> DataFrame:
         # 市级，模100为0
         .withColumn(
             "municipal_level",
-            (district_code_col.__mod__(100) == 0)
-            & (district_code_col.__mod__(DevConstants.DISTRICT_CODE_GUANGXI) != 0),
+            (
+                (district_code_col.__mod__(100) == 0)
+                | (district_code_col.__mod__(100) == 99)
+            )
+            & (district_code_col != DevConstants.DISTRICT_CODE_GUANGXI),
         )
         # 区级：模100不为0
         .withColumn("district_level", district_code_col.__mod__(100) != 0).withColumn(
@@ -218,16 +222,17 @@ def bidding_district_type(df: DataFrame) -> DataFrame:
     district_df = (
         df.filter(func.col("district_level"))
         .groupby("district_level")
-        .agg(func.count("district_level").alias("district_count"))
+        .agg(
+            func.count("district_level").alias("district_count"),
+            func.sum(ProjectKey.TOTAL_AMOUNT).alias("district_amount"),
+        )
     ).drop("district_level")
 
     if district_df.count() == 0:
         district_df = dataframe_tools.create_dataframe(data=[{"district_count": 0}])
 
-    all_df = dataframe_tools.create_dataframe(data=[{"total_count": total_count}])
-
     result_df = dataframe_tools.join_dataframes(
-        dfs=[provincial_df, municipal_df, district_df, all_df],
+        dfs=[provincial_df, municipal_df, district_df, total_df],
         depend_on=None,
         how_join="cross",
     )

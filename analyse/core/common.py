@@ -2,7 +2,7 @@ from typing import Callable
 
 from pyspark.sql import functions as func
 from pyspark.sql import DataFrame, GroupedData
-from pyspark.sql.types import TimestampType
+from pyspark.sql.types import TimestampType, IntegerType
 from constants import ProjectKey, DevConstants
 from utils import dataframe_tools
 
@@ -11,6 +11,7 @@ def add_time_columns(df: DataFrame) -> DataFrame:
     """
     将时间戳计算出对应的年月日和季度：year、month、day、quarter
     """
+    a = 1
     tp_col = func.col(ProjectKey.SCRAPE_TIMESTAMP)
     return (
         df.withColumn(
@@ -19,7 +20,11 @@ def add_time_columns(df: DataFrame) -> DataFrame:
         .withColumn("year", func.year(tp_col))
         .withColumn("month", func.month(tp_col))
         .withColumn("day", func.dayofmonth(tp_col))
-        .withColumn("quarter", ((func.month(tp_col) - 1).__mod__(3)) + 1)
+        # 1: 1 2 3 | 2: 4 5 6 | 3: 7 8 9 | 4: 10 11 12
+        .withColumn(
+            "quarter",
+            ((func.month(tp_col) - 1).cast(IntegerType()) / 3).cast(IntegerType()) + 1,
+        )
     )
 
 
@@ -46,7 +51,7 @@ def stats_all(
     """
     # 将时间戳计算出对应的年月日和季度
     df = add_time_columns(df).drop(ProjectKey.SCRAPE_TIMESTAMP)
-    # 分别算出
+    # 分别算出年月日和季度的数据
     days_df = agg_func(df.groupby(*groupby_cols, "year", "month", "day"), df.columns)
     months_df = agg_func(df.groupby(*groupby_cols, "year", "month"), df.columns)
     quarters_df = agg_func(df.groupby(*groupby_cols, "year", "quarter"), df.columns)
@@ -58,15 +63,17 @@ def stats_all(
         else:
             return complete_time_columns(_df)
 
+    # 将这些数据合并到一个表中
     district_df = dataframe_tools.union_dataframes(
         union_dfs=[days_df, months_df, quarters_df, years_df],
         callback=action,
         by_name=True,
     )
-
+    # 将地区的代码改成同一个省的
     province_df = agg_func(
         district_df.withColumn(
-            ProjectKey.DISTRICT_CODE, func.lit(DevConstants.DISTRICT_CODE_GUANGXI)
+            ProjectKey.DISTRICT_CODE,
+            func.lit(DevConstants.STATS_DISTRICT_CODE_PROVINCE),
         ).groupby(*groupby_cols, "year", "month", "day", "quarter"),
         district_df.columns,
     )

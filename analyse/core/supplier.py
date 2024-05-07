@@ -1,10 +1,8 @@
 from pyspark.sql import DataFrame, GroupedData
 from pyspark.sql import functions as func
-
+from pyspark.sql import window
 from analyse.core import common
-from analyse.schemas import BID_ITEM_SCHEMA
-from constants import ProjectKey, DevConstants, BidItemKey
-from utils import dataframe_tools
+from constants import ProjectKey, BidItemKey
 
 
 def suppliers_occurrences(df: DataFrame) -> DataFrame:
@@ -32,35 +30,17 @@ def suppliers_occurrences(df: DataFrame) -> DataFrame:
         .filter(func.col("supplier").isNotNull())
     )
 
-    df = common.add_time_columns(df)
+    def agg_fun(gd: GroupedData, columns: list[str]) -> DataFrame:
+        if "count" not in columns:
+            return gd.agg(func.count("*").alias("count"))
+        else:
+            return gd.agg(func.sum("count").alias("count"))
 
-    days_df = df.groupby(
-        ProjectKey.DISTRICT_CODE, "supplier", "year", "month", "day"
-    ).count()
-    months_df = df.groupby(
-        ProjectKey.DISTRICT_CODE, "supplier", "year", "month"
-    ).count()
-    quarters_df = df.groupby(
-        ProjectKey.DISTRICT_CODE, "supplier", "year", "quarter"
-    ).count()
-    years_df = df.groupby(ProjectKey.DISTRICT_CODE, "supplier", "year").count()
-
-    district_df = dataframe_tools.union_dataframes(
-        union_dfs=[days_df, months_df, quarters_df, years_df],
-        callback=common.complete_time_columns,
-        by_name=True,
+    return common.stats_all(
+        df=df,
+        groupby_cols=[ProjectKey.DISTRICT_CODE, "supplier"],
+        agg_func=agg_fun,
     )
-
-    province_df = (
-        district_df.withColumn(
-            ProjectKey.DISTRICT_CODE, func.col(DevConstants.DISTRICT_CODE_GUANGXI)
-        )
-        .groupby(
-            ProjectKey.DISTRICT_CODE, "supplier", "year", "month", "day", "quarter"
-        )
-        .agg(func.sum("*").alias("count"))
-    )
-    return district_df.unionByName(province_df)
 
 
 def supplier_transactions_volume(
@@ -102,45 +82,60 @@ def supplier_transactions_volume(
             "amount",
             func.when(
                 func.col("is_percent"),
-                func.col("amount") * func.col(ProjectKey.TOTAL_BUDGET),
+                func.col("amount")
+                * func.when(func.col(ProjectKey.TOTAL_BUDGET) < 0, 0).otherwise(
+                    func.col(ProjectKey.TOTAL_BUDGET)
+                ),
             ).otherwise(func.col("amount")),
         )
         .drop("is_win", "is_percent")
     )
-    df = common.add_time_columns(df).drop(ProjectKey.SCRAPE_TIMESTAMP)
 
-    def stats(gd: GroupedData) -> DataFrame:
-        return gd.agg(
-            func.sum("amount").alias("transactions_volume"),
-            func.count("*").alias("bidding_count"),
-        )
+    def agg_func(gd: GroupedData, columns: list[str]) -> DataFrame:
+        if "amount" in columns:
+            return gd.agg(
+                func.sum("amount").alias("transactions_volume"),
+                func.count("*").alias("bidding_count"),
+            )
+        else:
+            return gd.agg(
+                func.sum("transactions_volume").alias("transactions_volume"),
+                func.sum("bidding_count").alias("bidding_count"),
+            )
 
-    days_df = stats(
-        df.groupby(ProjectKey.DISTRICT_CODE, "supplier", "year", "month", "day")
-    )
-    months_df = stats(df.groupby(ProjectKey.DISTRICT_CODE, "supplier", "year", "month"))
-    quarters_df = stats(
-        df.groupby(ProjectKey.DISTRICT_CODE, "supplier", "year", "quarter")
-    )
-    year_df = stats(df.groupby(ProjectKey.DISTRICT_CODE, "supplier", "year"))
-
-    district_df = dataframe_tools.union_dataframes(
-        union_dfs=[days_df, months_df, quarters_df, year_df],
-        callback=common.complete_time_columns,
-        by_name=True,
+    return common.stats_all(
+        df=df, groupby_cols=[ProjectKey.DISTRICT_CODE, "supplier"], agg_func=agg_func
     )
 
-    province_df = (
-        district_df.withColumn(
-            ProjectKey.DISTRICT_CODE, func.lit(DevConstants.DISTRICT_CODE_GUANGXI)
-        )
-        .groupby(
-            ProjectKey.DISTRICT_CODE, "supplier", "year", "month", "day", "quarter"
-        )
-        .agg(
-            func.sum("transactions_volume").alias("transactions_volume"),
-            func.count("*").alias("bidding_count"),
-        )
-    )
 
-    return district_df.unionByName(province_df)
+def supplier_situations(df: DataFrame) -> DataFrame:
+    """
+    供应生和其采购种类的个数
+    """
+    df = (
+        df.select(ProjectKey.CATALOG, func.explode(ProjectKey.BID_ITEMS).alias("items"))
+        .select(
+            ProjectKey.CATALOG,
+            func.col(f"items.{BidItemKey.SUPPLIER}").alias("supplier"),
+        )
+        .filter(func.col("supplier").isNotNull())
+        .groupby("supplier", ProjectKey.CATALOG)
+        .agg(func.count("*").alias("count"))
+    )
+    return df
+
+
+def supplier_address(df: DataFrame) -> DataFrame:
+    df = (
+        df.select(func.explode(ProjectKey.BID_ITEMS).alias("items"))
+        .select(
+            func.col(f"items.{BidItemKey.SUPPLIER}").alias("supplier"),
+            func.col(f"items.{BidItemKey.SUPPLIER_ADDRESS}").alias("address"),
+        )
+        .filter(func.col("supplier").isNotNull())
+        .groupby("supplier", "address")
+        .sum()
+        .dropDuplicates(["supplier"])  # 去掉重复的供应商
+        .filter(func.length("supplier") >= 2)
+    )
+    return df

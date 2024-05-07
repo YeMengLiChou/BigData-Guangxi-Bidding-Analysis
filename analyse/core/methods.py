@@ -46,4 +46,4 @@ def procurement_method_count(
         df,
         groupby_cols=[ProjectKey.DISTRICT_CODE, ProjectKey.PROCUREMENT_METHOD],
         agg_func=agg_func,
-    ).filter(func.col(ProjectKey.DISTRICT_CODE) == 45000)
+    )

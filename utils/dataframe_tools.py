@@ -1,7 +1,8 @@
 from typing import Any, Union, Callable
 
-from pyspark.sql import DataFrame, functions as func, Column
+from pyspark.sql import DataFrame, functions as func, Column, Row
 from pyspark.sql.session import SparkSession
+from pyspark.sql.types import StructField, IntegerType
 
 
 def append_columns(df: DataFrame, columns: dict[str, Column]) -> DataFrame:
@@ -61,18 +62,14 @@ def join_dataframes(
     result_df = dfs[0]
     if n == 1:
         return result_df
-
     if depend_on:
-        depend_cols = []
-        for i in range(len(depend_on)):
-            if isinstance(depend_on[i], str):
-                depend_cols.append(func.col(depend_on[i]))
-            else:
-                depend_cols.append(func.col(depend_on[i]))
-    else:
-        depend_cols = None
+        for i in depend_on:
+            if not isinstance(i, (str, Column)):
+                raise ValueError(
+                    f"`depend_on` expect `Column` or `str`, but got `{type(i)}`!"
+                )
     for i in range(1, n):
-        result_df = result_df.join(other=dfs[i], on=depend_cols, how=how_join)
+        result_df = result_df.join(other=dfs[i], on=depend_on, how=how_join)
     return result_df
 
 
@@ -95,5 +92,27 @@ def union_dataframes(
     return result_df
 
 
-def create_dataframe(data: list[dict]) -> DataFrame:
+def create_dataframe(data: list[dict[str, Any]]) -> DataFrame:
     return SparkSession.Builder().appName("analyse").getOrCreate().createDataFrame(data)
+
+
+def get_spark_session() -> SparkSession:
+    return SparkSession.Builder().appName("analyse").getOrCreate()
+
+
+def append_self_increasing_column(df: DataFrame) -> DataFrame:
+    """
+    给 ``df`` 增加自增列 `id`，返回新的 DataFrame
+    """
+    # 可能存在某些数据全是NULL，createDataFrame 无法识别这些内容，因此在这里加上一个id
+    schema = df.schema
+    schema.add(StructField("id", IntegerType()))
+
+    def merge_row(tp: tuple[Row, int]):
+        row_content = tp[0].asDict()
+        row_content["id"] = tp[1]
+        return Row(**row_content)
+
+    rdd = df.rdd.zipWithIndex()
+    row_rdd = rdd.map(merge_row)
+    return get_spark_session().createDataFrame(row_rdd, schema)
