@@ -14,7 +14,6 @@ fun Application.configureErrorHandle() {
 
     install(StatusPages) {
         exception<ApiException> { call, cause ->
-//            call.response.headers.append("Content-Type", "application/json")
             call.respond(ApiResult.failure(cause.code, cause.msg))
         }
 

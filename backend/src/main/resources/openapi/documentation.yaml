@@ -1,0 +1,203 @@
+openapi: "3.0.3"
+info:
+  title: "backend API"
+  description: "backend API"
+  version: "1.0.0"
+servers:
+- url: "https://backend"
+paths:
+  /api/districtCode/adds:
+    post:
+      description: "插入多条数据"
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              type: "array"
+              items:
+                $ref: "#/components/schemas/DistrictCode"
+        required: true
+      responses:
+        "200":
+          description: "OK"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResult"
+  /api/districtCode/all:
+    get:
+      description: "返回所有数据"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResult_List<? extends DistrictCode>"
+  /api/districtCode/classify:
+    get:
+      description: "返回根据 type 返回的数据"
+      parameters:
+      - name: "type"
+        in: "query"
+        required: false
+        schema:
+          type: "string"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResult_List<? extends DistrictCode>"
+  /api/districtCode/tree:
+    get:
+      description: "以树的形式返回数据"
+      parameters:
+      - name: "code"
+        in: "query"
+        required: false
+        schema:
+          type: "string"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            '*/*':
+              schema: {}
+  /api/test:
+    get:
+      description: ""
+      parameters:
+      - name: "pageSize"
+        in: "query"
+        required: false
+        schema:
+          type: "string"
+      - name: "pageNo"
+        in: "query"
+        required: false
+        schema:
+          type: "string"
+      responses:
+        "200":
+          description: "OK"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ApiResult_Page<Test2>"
+components:
+  schemas:
+    DistrictCode:
+      type: "object"
+      properties:
+        code:
+          type: "integer"
+          format: "int32"
+        name:
+          type: "string"
+        fullName:
+          type: "string"
+        shortName:
+          type: "string"
+        parentCode:
+          type: "integer"
+          format: "int32"
+        type:
+          type: "integer"
+          format: "int32"
+      required:
+      - "name"
+      - "fullName"
+      - "shortName"
+    ApiResult:
+      type: "object"
+      properties:
+        code:
+          type: "integer"
+          format: "int32"
+        msg:
+          type: "string"
+      required:
+      - "msg"
+    ApiResult_List<? extends DistrictCode>:
+      type: "object"
+      properties:
+        code:
+          type: "integer"
+          format: "int32"
+        msg:
+          type: "string"
+        data:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/DistrictCode"
+    DistrictCodeTree:
+      type: "object"
+      properties:
+        code:
+          type: "integer"
+          format: "int32"
+        name:
+          type: "string"
+        fullName:
+          type: "string"
+        shortName:
+          type: "string"
+        parentCode:
+          type: "integer"
+          format: "int32"
+        type:
+          type: "integer"
+          format: "int32"
+        children:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/DistrictCodeTree"
+      required:
+      - "name"
+      - "fullName"
+      - "shortName"
+      - "children"
+    ApiResult_DistrictCodeTree:
+      type: "object"
+      properties:
+        code:
+          type: "integer"
+          format: "int32"
+        msg:
+          type: "string"
+        data:
+          $ref: "#/components/schemas/DistrictCodeTree"
+    Test2:
+      type: "object"
+      properties:
+        districtCode:
+          type: "string"
+        year:
+          type: "integer"
+          format: "int32"
+        month:
+          type: "integer"
+          format: "int32"
+        day:
+          type: "integer"
+          format: "int32"
+        quarter:
+          type: "integer"
+          format: "int32"
+        transactionVolume:
+          type: "number"
+          format: "double"
+      required:
+      - "districtCode"
+    ApiResult_Page<Test2>:
+      type: "object"
+      properties:
+        code:
+          type: "integer"
+          format: "int32"
+        msg:
+          type: "string"
+        data:
+          $ref: "#/components/schemas/Test2"

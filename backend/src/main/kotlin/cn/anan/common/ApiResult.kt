@@ -5,7 +5,7 @@ import com.google.protobuf.Api
 /**
  * Api自定义结果类
  */
-class ApiResult<T> (
+data class ApiResult<T> (
     val code: Int,
     val msg: String,
     val data: T?,

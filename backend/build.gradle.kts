@@ -15,6 +15,7 @@ version = "0.0.1"
 application {
     mainClass.set("cn.anan.ApplicationKt")
 
+
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
@@ -30,10 +31,13 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm")
     implementation("io.ktor:ktor-serialization-jackson-jvm")
     implementation("io.ktor:ktor-server-netty-jvm")
-    implementation("com.mysql:mysql-connector-j:8.0.31")
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("org.ktorm:ktorm-core:${ktormVersion}")
+    implementation("org.ktorm:ktorm-support-mysql:${ktormVersion}")
+    implementation("io.ktor:ktor-server-swagger:$ktorVersion")
+    implementation("io.ktor:ktor-server-openapi:${ktorVersion}")
+    implementation("com.mysql:mysql-connector-j:8.0.31")
     testImplementation("io.ktor:ktor-server-tests-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlinVersion")
 }

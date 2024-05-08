@@ -9,13 +9,14 @@ import io.ktor.server.netty.*
 fun main() {
     initDatabase()
 
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
+    embeddedServer(Netty, port = 8080, host = "0.0.0.0", watchPaths = listOf("classes", "resources"), module = Application::module)
         .start(wait = true)
 }
 
 fun Application.module() {
-//    configureHTTP()
-//    configureSerialization()
+    configureCORS()
+    configureSerialization()
     configureErrorHandle()
+    configureSwagger()
     configureRouting()
 }

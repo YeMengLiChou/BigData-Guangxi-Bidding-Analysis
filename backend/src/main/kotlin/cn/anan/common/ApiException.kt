@@ -10,3 +10,4 @@ class ApiException(
 
     constructor(statusCode: StatusCode): this(statusCode.code, statusCode.msg)
 }
+
