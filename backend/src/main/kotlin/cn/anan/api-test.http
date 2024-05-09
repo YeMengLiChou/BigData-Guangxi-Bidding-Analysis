@@ -42,14 +42,21 @@ Accept: application/json
 GET http://localhost:8080/api/transaction/all
 Accept: application/json
 
+### 请求指定市级地区的成交量
+GET http://localhost:8080/api/transaction?districtCode=450100
+Accept: application/json
+
 
 ###
 GET http://localhost:8080/api/districtCode/city
 Accept: application/json
 
-
 ### 获取市级地区的增长情况
 GET http://localhost:8080/api/transaction/growth
+Accept: application/json
+
+### 获取各年的公告数量
+GET http://localhost:8080/api/bidding/count
 Accept: application/json
 
 

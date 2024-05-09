@@ -48,6 +48,16 @@ fun Route.biddingAnnouncementApi() {
                 )
             )
         }
+        /**
+         * 返回各年份的公告数
+         * */
+        get("count") {
+            call.respond(
+                ApiResult.success(
+                    data = BiddingAnnouncementService.fetchBiddingCountWithYears()
+                )
+            )
+        }
 
     }
 }

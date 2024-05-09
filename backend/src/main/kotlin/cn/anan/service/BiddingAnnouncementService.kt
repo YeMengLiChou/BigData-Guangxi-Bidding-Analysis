@@ -1,15 +1,10 @@
 package cn.anan.service
 
-import cn.anan.common.ApiException
-import cn.anan.common.Page
-import cn.anan.common.StatusCode
-import cn.anan.common.Validations
+import cn.anan.common.*
 import cn.anan.db.database
 import cn.anan.db.entity.PageRequest
-import cn.anan.db.table.BiddingAnnouncement
-import cn.anan.db.table.BiddingAnnouncements
-import cn.anan.db.table.BiddingDistrictStats
-import cn.anan.db.table.BiddingDistrictStatsTable
+import cn.anan.db.table.*
+import cn.anan.db.vo.BiddingCountItem
 import org.ktorm.dsl.*
 import java.util.*
 
@@ -108,6 +103,32 @@ object BiddingAnnouncementService {
             .map {
                 BiddingDistrictStatsTable.createEntity(it)
             }[0]
+        return data
+    }
+
+    /**
+     * 获取各年的公告数
+     * */
+    fun fetchBiddingCountWithYears(): List<BiddingCountItem> {
+        val data = database
+            .from(BiddingStatsTable)
+            .select()
+            .where {
+                (BiddingStatsTable.month eq 0)
+                    .and(BiddingStatsTable.quarter eq 0)
+                    .and(BiddingStatsTable.districtCode eq GUANGXI_STATS_DISTRICT_CODE)
+            }.map {
+                BiddingStatsTable.createEntity(it)
+            }
+            .groupBy { it.year }
+            .map { item ->
+                BiddingCountItem(
+                    year = item.key,
+                    winCount = item.value.sumOf { it.winCount },
+                    loseCount = item.value.sumOf { it.loseCount },
+                    terminateCount = item.value.sumOf { it.terminateCount }
+                )
+            }
         return data
     }
 }
