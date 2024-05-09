@@ -6,7 +6,8 @@ import Bell from "@iconify-icons/ep/bell";
 
 const noticesNum = ref(0);
 const notices = ref(noticesData);
-const activeKey = ref(noticesData[0].key);
+// const activeKey = ref(noticesData[0].key);
+const activeKey = ref("");
 
 notices.value.map(v => (noticesNum.value += v.list.length));
 </script>
@@ -14,11 +15,15 @@ notices.value.map(v => (noticesNum.value += v.list.length));
 <template>
   <el-dropdown trigger="click" placement="bottom-end">
     <span class="dropdown-badge navbar-bg-hover select-none">
-      <el-badge :value="noticesNum" :max="99">
+      <el-badge :value="noticesNum" :max="99" v-if="noticesNum > 0">
         <span class="header-notice-icon">
           <IconifyIconOffline :icon="Bell" />
         </span>
       </el-badge>
+        <span class="header-notice-icon" v-else>
+          <IconifyIconOffline :icon="Bell" />
+        </span>
+
     </span>
     <template #dropdown>
       <el-dropdown-menu>

@@ -8,16 +8,18 @@ export default {
   meta: {
     icon: "ep:trend-charts",
     title: "概要",
-    rank: 0
+    rank: 0,
   },
   children: [
     {
       path: "/home",
-      name: "Home",
+      name: "HomeIndex",
       component: () => import("@/views/home/index.vue"),
       meta: {
         title: "概要",
-        showLink: true
+        keepAlive: true,
+        showLink: true,
+        showParent: true,
       }
     }
   ]

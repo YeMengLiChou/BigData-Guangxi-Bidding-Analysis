@@ -39,6 +39,63 @@ const permissionRouter = {
   ]
 };
 
+const districtCodes = [
+  [450100, ["南宁市", "NanNing"]],
+  [450200, ["柳州市", "LiuZhou"]],
+  [450300, ["桂林市", "GuiLin"]],
+  [450400, ["梧州市", "WuZhou"]],
+  [450500, ["北海市", "BeiHai"]],
+  [450600, ["防城港市", "FangChengGang"]],
+  [450700, ["钦州市", "QinZhou"]],
+  [450800, ["贵港市", "GuiGang"]],
+  [450900, ["玉林市", "YuLin"]],
+  [451000, ["百色市", "BaiSe"]],
+  [451100, ["贺州市", "HeZhou"]],
+  [451200, ["河池市", "HeChi"]],
+  [451300, ["来宾市", "LaiBin"]],
+  [451400, ["崇左市", "ConZuo"]]
+];
+
+const districtRoutes = {
+  path: "/district",
+  redirect: "/district/about",
+  meta: {
+    icon: "ep:location-filled",
+    title: "地区",
+    rank: 10,
+    showLink: true
+  },
+  children: [
+    {
+      path: "/district/about",
+      name: "DistrictAbout",
+      component: "district/about/DistrictAbout",
+      meta: {
+        title: "总览"
+      }
+    },
+    {
+      path: "/district/city",
+      name: "DistrictCity",
+      meta: {
+        title: "市级"
+      },
+      children: districtCodes.map(district => {
+        const name = `District${district[1][1]}`;
+        return {
+          path: `/${district[0]}`,
+          name: name,
+          component: `district/city/${name}`,
+          meta: {
+            title: district[1][0]
+          }
+        };
+      })
+    }
+  ]
+};
+
+
 export default defineFakeRoute([
   {
     url: "/get-async-routes",
@@ -46,7 +103,7 @@ export default defineFakeRoute([
     response: () => {
       return {
         success: true,
-        data: [permissionRouter]
+        data: [permissionRouter, districtRoutes]
       };
     }
   }

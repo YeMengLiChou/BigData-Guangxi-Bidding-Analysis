@@ -1,283 +1,340 @@
 <script setup lang="ts">
-import echarts from "@/plugins/echarts";
-import { useTransition } from "@vueuse/core";
-import { ChatLineRound, Male } from "@element-plus/icons-vue";
-import { ref } from "vue";
-import TotalScaleCharts from "./charts/total-scale.vue";
-import RecentScaleCharts from './charts/recent-scale.vue';
-import ProcurementMethodsCharts from "./charts/procurement-methods.vue";
-
+import { ref, onMounted, watch } from "vue";
+import { ChartLine } from "./components";
+import ReCol from "@/components/ReCol";
+import { ReNormalCountTo } from "@/components/ReCountTo";
+import { fetchBaseInfo, fetchScaleData, ScaleData } from "@/api/base";
+import { BaseInfoVO } from "@/views/home/utils/types";
+import { transformBaseInfoVO } from "@/views/home/utils/fetch";
+import { message } from "@/utils/message";
+import { useDark } from "@pureadmin/utils";
 import {
-  ArrowRight,
-  CaretBottom,
-  CaretTop,
-  Warning
-} from "@element-plus/icons-vue";
+  fetchProcurementMethodData,
+  ProcurementMethodYearData
+} from "@/api/procurement";
+import {
+  BiddingCountItem,
+  BiddingDistrictStats,
+  fetchBiddingCount,
+  fetchBiddingDistrictStats
+} from "@/api/bidding";
+import ProcurementMethod from "@/views/home/tabs/procurement/ProcurementMethod.vue";
+import PurchaseScale from "@/views/home/tabs/scale/PurchaseScale.vue";
+import DistrictLevel from "@/views/home/tabs/district-level/DistrictLevel.vue";
+import DistrictScale from "@/views/home/tabs/district-scale/DistrictScale.vue";
+import {
+  fetchTransactionVolumeWithAllDistrict,
+  TransactionVolumeDistrictYear
+} from "@/api/transaction";
+import TotalBiddingCount from "@/views/home/tabs/count/TotalBiddingCount.vue";
 
 defineOptions({
-  name: "Home"
+  name: "HomeIndex"
 });
 
-// 动态变化，接口返回数据时可以使用
-const source = ref(0);
-const outputValue = useTransition(source, {
-  duration: 1500
-});
-source.value = 172000;
+const { isDark } = useDark();
 
+const statsData = ref<Array<BaseInfoVO>>([]);
+const statsLoading = ref(false);
 
-
-
-// 顶部 el-row 中每个 el-col 的宽度
-const colSpanSize = ref(5);
+// 获取上方的基本信息
+const fetchBaseInfoVO = () => {
+  statsLoading.value = true;
+  fetchBaseInfo()
+    .then(res => {
+      console.log("fetchBaseInfo", res);
+      if (res.code == 200) {
+        statsData.value = transformBaseInfoVO(res.data);
+      } else {
+        // TODO: raise err
+        message("获取失败！", {
+          type: "error"
+        });
+      }
+      statsLoading.value = false;
+    })
+    .catch(err => {
+      console.log("fetchBaseInfoVO error", err);
+      message("网络错误，请稍后重试！", {
+        type: "error"
+      });
+      statsLoading.value = false;
+    });
+};
 
 // 双向绑定 el-tabs 的当前激活的 tabs-pane 迷你改成
-const tabsActiveName = ref("0");
+const tabsActiveName = ref("");
 
+onMounted(() => {
+  // 设置为 0，触发 watch 的监听，进而获取图标数据
+  tabsActiveName.value = "0";
+  fetchBaseInfoVO();
+});
+
+// 图表1：采购规模的数据
+const scaleChatsData = ref<ScaleData>(null);
+// 获取数据
+const fetchScaleChartData = () => {
+  fetchScaleData()
+    .then(res => {
+      console.log("scaleChartData", res);
+      if (res.code == 200) {
+        scaleChatsData.value = res.data;
+      } else {
+        message("获取图表数据失败", { type: "error" });
+      }
+    })
+    .catch(err => {
+      console.log("fetchScaleChartData", err);
+      message("网络错误！请重试!", { type: "error" });
+    });
+};
+
+// 图表2：采购方式对比
+const procurementMethodChartData = ref<ProcurementMethodYearData[]>();
+const fetchProcurementMethodChartData = () => {
+  fetchProcurementMethodData()
+    .then(res => {
+      console.log("procurementChartData", res);
+      if (res.code == 200) {
+        procurementMethodChartData.value = res.data;
+      } else {
+        message("获取图表数据失败", { type: "error" });
+      }
+    })
+    .catch(err => {
+      console.log("procurementChartData", err);
+      message("网络错误！请重试!", { type: "error" });
+    });
+};
+
+// 地区政府
+const biddingDistrictChartData = ref<BiddingDistrictStats>(null);
+const fetchBiddingDistrictChartData = () => {
+  fetchBiddingDistrictStats()
+    .then(res => {
+      console.log("fetchBiddingDistrictStats", res);
+      if (res.code == 200) {
+        biddingDistrictChartData.value = res.data;
+      } else {
+        message("获取图表数据失败", { type: "error" });
+      }
+    })
+    .catch(err => {
+      console.log("fetchBiddingDistrictStats", err);
+      message("网络错误！请重试!", { type: "error" });
+    });
+};
+
+const recentBiddingAnnouncementData = ref<BiddingCountItem[]>(null);
+const fetchRecentBiddingAnnouncementData = () => {
+  fetchBiddingCount()
+    .then(res => {
+      console.log("fetchRecentBiddingAnnouncementData", res);
+      if (res.code == 200) {
+        recentBiddingAnnouncementData.value = res.data;
+      } else {
+        message("获取图表数据失败", { type: "error" });
+      }
+    })
+    .catch(err => {
+      console.log("fetchRecentBiddingAnnouncementData", err);
+      message("网络错误！请重试!", { type: "error" });
+    });
+};
+
+const districtTransactionVolumeData =
+  ref<Array<TransactionVolumeDistrictYear>>(null);
+const fetchDistrictTransactionVolumeData = () => {
+  fetchTransactionVolumeWithAllDistrict()
+    .then(res => {
+      console.log("fetchDistrictTransactionVolumeData", res);
+      if (res.code == 200) {
+        districtTransactionVolumeData.value = res.data;
+      } else {
+        message("获取图表数据失败", { type: "error" });
+      }
+    })
+    .catch(err => {
+      console.log("fetchBiddingDistrictStats", err);
+      message("网络错误！请重试!", { type: "error" });
+    });
+};
+
+watch(tabsActiveName, (value, _) => {
+  if (value === "0") {
+    if (!scaleChatsData.value) {
+      fetchScaleChartData();
+    }
+  } else if (value === "1") {
+    if (!procurementMethodChartData.value) {
+      fetchProcurementMethodChartData();
+    }
+  } else if (value === "2") {
+    if (!biddingDistrictChartData.value) {
+      fetchBiddingDistrictChartData();
+    }
+  } else if (value === "3") {
+    if (!recentBiddingAnnouncementData.value) {
+      fetchRecentBiddingAnnouncementData();
+    }
+  } else if (value === "4") {
+    if (!districtTransactionVolumeData.value) {
+      fetchDistrictTransactionVolumeData();
+    }
+  }
+});
 </script>
 
 <template>
-  <!-- 上方的统计列表 -->
-  <el-row justify="space-evenly">
-    <el-col :span="colSpanSize">
-      <div class="statistic-card">
-        <el-statistic :value="1">
-          <template #title>
-            <div style="display: inline-flex; align-items: center">
-              <el-text>当前数据范围</el-text>
-              <el-tooltip
-                effect="dark"
-                content="数据库中存储的公告数量"
-                placement="top"
-              >
-                <el-icon style="margin-left: 4px" :size="12">
-                  <Warning />
-                </el-icon>
-              </el-tooltip>
-            </div>
-          </template>
-        </el-statistic>
-        <div class="statistic-footer">
-          <div class="footer-item">
-            <span>than yesterday</span>
-            <span class="green">
-              24%
-              <el-icon>
-                <CaretTop />
-              </el-icon>
-            </span>
+  <el-row :gutter="24" justify="space-around">
+    <!--  上面部分的简概  -->
+    <re-col
+      v-loading="statsLoading"
+      class="mb-[18px]"
+      v-for="(item, index) in statsData"
+      :key="index"
+      :value="6"
+      :md="12"
+      :sm="12"
+      :xs="24"
+      :initial="{ opacity: 0, y: 100 }"
+      :enter="{ opacity: 1, y: 0, transition: { delay: 80 * (index + 1) } }"
+    >
+      <el-card>
+        <div class="flex justify-between">
+          <el-text class="text-md font-medium" size="large">
+            {{ item.name }}
+          </el-text>
+          <div
+            class="w-8 h-8 flex justify-center items-center rounded-md"
+            :style="{
+              backgroundColor: isDark ? 'transparent' : item.bgColor
+            }"
+          >
+            <IconifyIconOffline
+              :icon="item.icon"
+              :color="item.color"
+              width="18"
+            />
           </div>
         </div>
-      </div>
-    </el-col>
-    <el-col :span="colSpanSize">
-      <div class="statistic-card">
-        <el-statistic :value="98500">
-          <template #title>
-            <div style="display: inline-flex; align-items: center">
-              <el-text>当前统计总公告数</el-text>
-              <el-tooltip
-                effect="dark"
-                content="数据库中存储的公告数量"
-                placement="top"
-              >
-                <el-icon style="margin-left: 4px" :size="12">
-                  <Warning />
-                </el-icon>
-              </el-tooltip>
-            </div>
-          </template>
-        </el-statistic>
-        <div class="statistic-footer">
-          <div class="footer-item">
-            <span>than yesterday</span>
-            <span class="green">
-              24%
-              <el-icon>
-                <CaretTop />
-              </el-icon>
-            </span>
+        <div class="flex justify-between items-start mt-3">
+          <div class="w-1/2">
+            <ReNormalCountTo
+              :duration="item.duration"
+              :fontSize="'1.6em'"
+              :startVal="0"
+              :endVal="item.value"
+            />
           </div>
+          <ChartLine
+            v-if="item.data.length > 1"
+            class="!w-1/2"
+            :color="item.color"
+            :data="item.data"
+          />
         </div>
-      </div>
-    </el-col>
-    <el-col :span="colSpanSize">
-      <div class="statistic-card">
-        <el-statistic :value="693700">
-          <template #title>
-            <div style="display: inline-flex; align-items: center">
-              <el-text>成交总金额</el-text>
-              <el-tooltip
-                effect="dark"
-                content="当前数据库中成交公告统计的总金额"
-                placement="top"
-              >
-                <el-icon style="margin-left: 4px" :size="12">
-                  <Warning />
-                </el-icon>
-              </el-tooltip>
-            </div>
-          </template>
-        </el-statistic>
-        <div class="statistic-footer">
-          <div class="footer-item">
-            <span>month on month</span>
-            <span class="red">
-              12%
-              <el-icon>
-                <CaretBottom />
-              </el-icon>
-            </span>
-          </div>
-        </div>
-      </div>
-    </el-col>
-    <el-col :span="colSpanSize">
-      <div class="statistic-card">
-        <el-statistic :value="72000" title="New transactions today">
-          <template #title>
-            <div style="display: inline-flex; align-items: center">
-              成交公告数量
-            </div>
-          </template>
-        </el-statistic>
-        <div class="statistic-footer">
-          <div class="footer-item">
-            <span>than yesterday</span>
-            <span class="green">
-              16%
-              <el-icon>
-                <CaretTop />
-              </el-icon>
-            </span>
-          </div>
-          <div class="footer-item">
-            <el-icon :size="14">
-              <ArrowRight />
-            </el-icon>
-          </div>
-        </div>
-      </div>
-    </el-col>
-  </el-row>
+      </el-card>
+    </re-col>
 
-  <!-- 图表 -->
-  <el-row class="charts-container" justify="space-evenly">
-    <el-col :span="22" justify="space-evenly">
-      <el-container>
-        <el-main>
-          <el-tabs type="card" v-model="tabsActiveName" selectable="false">
-            <el-tab-pane label="采购总规模" name="0">
-              <el-row class="charts-row">
-                <el-col :span="12" class="charts-col">
-                  <TotalScaleCharts v-if="tabsActiveName === '0'" />
-                </el-col>
-                <el-col :span="12" class="charts-col">
-                  <RecentScaleCharts v-if="tabsActiveName === '0'" />
-                </el-col>
-              </el-row>
-            </el-tab-pane>
-            <el-tab-pane label="采购方式对比统计"> 
-              <ProcurementMethodsCharts v-if="tabsActiveName === '1'"/>  
-            </el-tab-pane>
-            <el-tab-pane label="政府级次分布图"> 图表3 </el-tab-pane>
-            <el-tab-pane label="近年度公告数对比"> 图表4 </el-tab-pane>
-            <el-tab-pane label="地区采购规模对比"> 地图 </el-tab-pane>
-          </el-tabs>
-        </el-main>
-      </el-container>
-    </el-col>
+    <!--  图表数据  -->
+    <re-col
+      class="mb-[18px] tab-charts-container"
+      :value="24"
+      :xs="24"
+      :initial="{
+        opacity: 0,
+        y: 100
+      }"
+      :enter="{
+        opacity: 1,
+        y: 0,
+        transition: {
+          delay: 400
+        }
+      }"
+    >
+      <el-card class="bar-card" shadow="never">
+        <span
+          class="text-md font-medium mb-4 ml-2 block"
+          style="font-size: large"
+          >分析概览</span
+        >
+        <el-tabs type="card" v-model="tabsActiveName" selectable="false">
+          <el-tab-pane label="采购总规模" name="0">
+            <PurchaseScale
+              v-if="tabsActiveName == '0' && scaleChatsData"
+              :data="scaleChatsData"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="采购方式对比统计" name="1">
+            <ProcurementMethod
+              v-if="tabsActiveName == '1' && procurementMethodChartData"
+              :data="procurementMethodChartData"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="政府级次分布图" name="2">
+            <DistrictLevel
+              v-if="tabsActiveName == '2' && biddingDistrictChartData"
+              :data="biddingDistrictChartData"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="近年度公告数对比" name="3">
+            <TotalBiddingCount
+              v-if="tabsActiveName == '3'"
+              :data="recentBiddingAnnouncementData"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="地区采购规模对比" name="4">
+            <DistrictScale
+              v-if="tabsActiveName == '4'"
+              :data="districtTransactionVolumeData"
+            />
+          </el-tab-pane>
+        </el-tabs>
+      </el-card>
+    </re-col>
   </el-row>
 </template>
 
 <style lang="css" scoped>
-:global(h2#card-usage ~ .example .example-showcase) {
-  background-color: var(--el-fill-color) !important;
+/* 主要页面设置外边距 */
+.main-content {
+  margin: 20px 20px 0 !important;
 }
 
-.el-statistic {
-  --el-statistic-content-font-size: 28px;
+.tab-charts-container {
+  height: 70vh;
 }
 
-.statistic-card {
+:deep(.el-card) {
   height: 100%;
-  padding: 20px;
-  border-radius: 4px;
-  background-color: var(--el-bg-color-overlay);
+  --el-card-border-color: none;
+
+  .el-card__body {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
 }
 
-.statistic-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--el-text-color-regular);
-  margin-top: 16px;
-}
-
-.statistic-footer .footer-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.statistic-footer .footer-item span:last-child {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 4px;
-}
-
-.green {
-  color: var(--el-color-success);
-}
-
-.red {
-  color: var(--el-color-error);
-}
-
-.el-row {
-  margin-top: 24px;
-}
-
- /* 设置背景以及大小 */
-.el-container {
-  height: 65vh;
-  background-color: var(--el-bg-color-overlay);
-  border-radius: 4px;
-}
-
-
-.el-main {
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-}
-
-.el-tabs {
+:deep(.el-tabs) {
   width: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
+  flex-grow: 1;
 
   /* 将 tabs 的 content 部分撑满 */
-  :deep .el-tabs__content {
-    flex: 1;
-    overflow: hidden;
+
+  .el-tabs__content {
+    flex-grow: 1;
   }
+
   /* 将 tab-pane 的内容撑满 */
-  :deep .el-tab-pane {
+
+  .el-tab-pane {
     height: calc(100%);
   }
-}
-
-/* 一行两个表 */
-.charts-row {
-  height: calc(100%);
-}
-
-
-.charts-col {
-  height: calc(100%);
 }
 </style>
