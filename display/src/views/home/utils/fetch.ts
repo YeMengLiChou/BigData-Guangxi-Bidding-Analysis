@@ -1,5 +1,9 @@
 import { BaseInfoVO } from "./types";
 import { BaseInfo } from "@/api/base";
+import Files from "@iconify-icons/ep/files";
+import CircleCheck from "@iconify-icons/ep/circle-check";
+import Money from "@iconify-icons/ep/money";
+import Shop from "@iconify-icons/ep/shopping-trolley";
 
 /**
  * 转换api数据为vo
@@ -7,7 +11,7 @@ import { BaseInfo } from "@/api/base";
 export const transformBaseInfoVO = (data: BaseInfo): Array<BaseInfoVO> => {
   const totalCountBaseInfo: BaseInfoVO = {
     name: "数据库公告数(条)",
-    icon: "ep:office-building",
+    icon: Files,
     bgColor: "#fff5f4",
     color: "#e85f33",
     duration: 1800,
@@ -17,7 +21,7 @@ export const transformBaseInfoVO = (data: BaseInfo): Array<BaseInfoVO> => {
 
   const transactionCountBaseInfo: BaseInfoVO = {
     name: "成交公告数(个)",
-    icon: "xxx",
+    icon: CircleCheck,
     bgColor: "#eff8f4",
     color: "#26ce83",
     duration: 1800,
@@ -26,7 +30,7 @@ export const transformBaseInfoVO = (data: BaseInfo): Array<BaseInfoVO> => {
   };
   const transactionVolumeBaseInfo: BaseInfoVO = {
     name: "成交总金额(¥)",
-    icon: "xxx",
+    icon: Money,
     bgColor: "#effaff",
     color: "#41b6ff",
     duration: 1800,
@@ -37,7 +41,7 @@ export const transformBaseInfoVO = (data: BaseInfo): Array<BaseInfoVO> => {
   // 供应商
   const supplierBaseInfo: BaseInfoVO = {
     name: "供应商统计个数",
-    icon: "xxx",
+    icon: Shop,
     bgColor: "#f6f4fe",
     color: "#7846e5",
     duration: 100,
