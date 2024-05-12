@@ -599,6 +599,10 @@ def make_item(result_data: dict, purchase_data: Union[dict, None]):
     else:
         item[ProjectKey.TOTAL_AMOUNT] = 0
 
+    item[CollectDevKey.PARRED_RESULT_ARTICLE_ID] = result_data[
+        CollectDevKey.PARRED_RESULT_ARTICLE_ID
+    ]
+
     if utils.debug_stats.DEBUG_STATUS:
         log.json(logger.info, item)
     return item
@@ -744,4 +748,5 @@ def make_bid_item_with_no_data(data: dict) -> dict:
     item[ProjectKey.BID_ITEMS] = []
     item[ProjectKey.TOTAL_BUDGET] = -1
     item[ProjectKey.TOTAL_AMOUNT] = -1
+    item[CollectDevKey.PARRED_RESULT_ARTICLE_ID] = data.get(CollectDevKey.PARRED_RESULT_ARTICLE_ID, 0)
     return item

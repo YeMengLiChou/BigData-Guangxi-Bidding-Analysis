@@ -121,9 +121,12 @@ def complete_error(error: ParseError, response: Response):
                 error.article_ids = [error.article_ids]
 
             error.article_ids.append("|")
-            error.article_ids.extend(
-                response.meta.get(ProjectKey.PURCHASE_ARTICLE_ID, None)
-            )
+            purchase_id = response.meta.get(ProjectKey.PURCHASE_ARTICLE_ID, None)
+            if isinstance(purchase_id, list):
+                error.article_ids.extend(purchase_id)
+            else:
+                error.article_ids.append(purchase_id)
+
     # 最开始的id
     if not error.start_article_id:
         error.start_article_id = response.meta.get(
@@ -146,7 +149,7 @@ class ParseErrorHandlerMiddleware:
 
     LOG_FILE_NAME = "parse_errors.log"
 
-    JSON_FILE_NAME = "parse_errors.json1"
+    JSON_FILE_NAME = "parse_errors.json"
 
     def __init__(self, crawler: Crawler):
         settings = crawler.settings

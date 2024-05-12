@@ -62,7 +62,7 @@ def parse_not_win_bid(parts: dict[int, list[str]]):
 
 class NotWinBidStandardFormatParser(AbstractFormatParser):
     PATTERN_BID_ITEM_CHECK = re.compile(
-        r"(((\d+|[A-Z])(?:标项|分标|标段|包))|((?:标项|分标|标段|包)(\d+|[A-Z])))[:：]"
+        r"(((\d+|[A-Z])(?:标项|分标|标段|包))|((?:标项|分标|标段|包)(\d+|[A-Z])))[:：]?"
     )
 
     # 分标xx至分标xx
@@ -133,7 +133,7 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
             == 0
         ):
             # 根据 。分段，并去除空白字符
-            part = list(filter(lambda x: x, string.split("。")))
+            part = list(filter(lambda x: x.strip(), string.split("。")))
 
             # 存在 "分标1:xxxx;分标2:xxxx;" 这种合并在同一个字符串的情况
             parts = []
@@ -162,18 +162,18 @@ class NotWinBidStandardFormatParser(AbstractFormatParser):
                 # 解析出是第几个标项
                 # 数字分标：分标1:xxxx
                 if (
-                    match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_FRONT.match(
+                    match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_FRONT.search(
                         p
                     )
                 ) or (
-                    match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_BACK.match(
+                    match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_NUMBER_INDEX_BACK.search(
                         p
                     )
                 ):
                     index, reason = match.group(1), match.group(2)
 
                 # 字母分标：A分标:xxxx
-                elif match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_CHARACTER_INDEX.match(
+                elif match := NotWinBidStandardFormatParser.PATTERN_BID_ITEM_CHARACTER_INDEX.search(
                     p
                 ):
                     index, reason = match.group(1), match.group(2)

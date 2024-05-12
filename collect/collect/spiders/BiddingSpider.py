@@ -71,13 +71,28 @@ def _make_detail_request(article_id: str, callback: callable, meta: dict):
 
 
 @stats.function_stats(logger)
-def _parse_other_announcements(other_announcements: list, meta: dict):
+def _parse_other_announcements(other_announcements: list | None, meta: dict):
     """
     解析 announcementLinkDtoList 中的信息，用于保证其他情况的出现时先前的不会漏
     :param other_announcements:
     :return:
     """
+    # 没有其他公告，需要设置初始值
     if not other_announcements:
+        meta[ProjectKey.RESULT_ARTICLE_ID], meta[ProjectKey.RESULT_PUBLISH_DATE] = [
+            meta[ProjectKey.RESULT_SOURCE_ARTICLE_ID]
+        ], [ProjectKey.SCRAPE_TIMESTAMP]
+        meta[ProjectKey.PURCHASE_ARTICLE_ID], meta[ProjectKey.PURCHASE_PUBLISH_DATE] = (
+            [],
+            [],
+        )
+        meta[ProjectKey.TENDER_DURATION] = -1
+        # 标记该公告机已经解析
+        parsed_result_id = 1
+        meta[CollectDevKey.PARRED_RESULT_ARTICLE_ID] = parsed_result_id
+        meta[CollectDevKey.START_RESULT_ARTICLE_ID] = meta[
+            ProjectKey.RESULT_SOURCE_ARTICLE_ID
+        ]
         return
 
     # 如果已经解析过了，则无需解析，（存在于前一个结果公告不能解析，切换到下一个解析）
@@ -340,6 +355,13 @@ class BiddingSpider(scrapy.Spider):
                     article_id=urllib.parse.unquote(article_id),
                     callback=self.parse_result_detail_content,
                     meta={
+                        ProjectKey.TITLE: None,
+                        ProjectKey.PURCHASE_TITLE: None,
+                        ProjectKey.DISTRICT_NAME: None,
+                        ProjectKey.PURCHASE_SOURCE_ARTICLE_ID: None,
+                        ProjectKey.RESULT_SOURCE_ARTICLE_ID: urllib.parse.unquote(
+                            article_id
+                        ),
                         ProjectKey.RESULT_ARTICLE_ID: urllib.parse.unquote(article_id),
                         ProjectKey.SCRAPE_TIMESTAMP: 0,
                         ProjectKey.IS_WIN_BID: is_win,
@@ -489,13 +511,30 @@ class BiddingSpider(scrapy.Spider):
                     article_id = get_article_id_from_url(response.url)
                     if article_id != meta[ProjectKey.RESULT_SOURCE_ARTICLE_ID]:
                         meta[ProjectKey.RESULT_SOURCE_ARTICLE_ID] = article_id
+                        if title is not None:
+                            meta[ProjectKey.TITLE] = title
+
+                    if meta[ProjectKey.TITLE] is None:
                         meta[ProjectKey.TITLE] = title
 
+                    # 解析其他公告
+                    _parse_other_announcements(
+                        other_announcements=data["announcementLinkDtoList"],
+                        meta=meta,
+                    )
+
                     # 公开征集公告省略
-                    if "公开征集" in title and "中标候选" in title:
+                    if (
+                        "公开征集" in title
+                        or "中标候选" in title
+                        or "资格审查" in title
+                    ):
                         logger.warning(
                             f"该公告为征集公告或中标候选 ，跳过 title: `{title}`"
                         )
+                        meta[CollectDevKey.PARRED_RESULT_ARTICLE_ID] = (
+                            1 << len(meta[ProjectKey.RESULT_ARTICLE_ID])
+                        ) - 1
                         # 生成部分信息的item
                         yield common.make_bid_item_with_no_data(meta)
                         return
@@ -505,11 +544,6 @@ class BiddingSpider(scrapy.Spider):
 
                     if meta.get(ProjectKey.DISTRICT_CODE, None) is None:
                         meta[ProjectKey.DISTRICT_CODE] = data["districtCode"]
-
-                    # 解析其他公告
-                    _parse_other_announcements(
-                        other_announcements=data["announcementLinkDtoList"], meta=meta
-                    )
 
                     # 判断是否为所需要的结果公告
                     if data["announcementType"] and common.check_unuseful_announcement(
@@ -578,8 +612,12 @@ class BiddingSpider(scrapy.Spider):
         # 使用位运算找到还没解析的结果公告
         for i in range(m):
             if (parsed_result_id >> i) & 1 == 0:
-                next_result_id = result_ids[i]
-                next_idx = i
+                # 如果该公告已经检索过，则跳过
+                if redis.check_article_id_exist(article_id=result_ids[i]):
+                    parsed_result_id |= 1 << i
+                else:
+                    next_result_id = result_ids[i]
+                    next_idx = i
                 break
 
         # 如果和起点一样，则查找逻辑存在问题，需要修改
@@ -604,13 +642,15 @@ class BiddingSpider(scrapy.Spider):
                 meta=meta,
             )
         else:
-            raise ParseError(
-                msg="不存在其他的结果公告可以解析",
-                content=[
-                    f"parsed_article_id: {bin(parsed_result_id)[2:]}",
-                    *result_ids,
-                ],
-            )
+            # 没有其他结果公告就直接收集
+            yield common.make_bid_item_with_no_data(data=meta)
+            # raise ParseError(
+            #     msg="不存在其他的结果公告可以解析",
+            #     content=[
+            #         f"parsed_article_id: {bin(parsed_result_id)[2:]}",
+            #         *result_ids,
+            #     ],
+            # )
 
     @stats.function_stats(logger)
     def switch_other_purchase_announcement(self, meta: dict):
@@ -673,12 +713,6 @@ class BiddingSpider(scrapy.Spider):
                     parsed |= 1 << index
                     meta[CollectDevKey.PARRED_PURCHASE_ARTICLE_ID] = parsed
 
-                # 如果不匹配，那么来源数据的id需要改为当前的id
-                article_id = get_article_id_from_url(response.url)
-                if article_id != meta[ProjectKey.PURCHASE_SOURCE_ARTICLE_ID]:
-                    meta[ProjectKey.PURCHASE_SOURCE_ARTICLE_ID] = article_id
-                    meta[ProjectKey.PURCHASE_TITLE] = data['title']
-
                 # 某些文章id返回的数据为None，需要预选处理
                 if data is None:
                     logger.warning(
@@ -696,6 +730,16 @@ class BiddingSpider(scrapy.Spider):
                         return None
 
                 try:
+                    # 如果不匹配，那么来源数据的id需要改为当前的id
+                    article_id = get_article_id_from_url(response.url)
+                    if article_id != meta[ProjectKey.PURCHASE_SOURCE_ARTICLE_ID]:
+                        meta[ProjectKey.PURCHASE_SOURCE_ARTICLE_ID] = article_id
+                        if (title:=data['title']) is not None:
+                            meta[ProjectKey.PURCHASE_TITLE] = title
+
+                    if meta[ProjectKey.PURCHASE_TITLE] is None:
+                        meta[ProjectKey.PURCHASE_TITLE] = data['title']
+
                     # 更新 html 内容
                     purchase_data = purchase.parse_html(html_content=data["content"])
                 except ParseError:

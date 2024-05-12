@@ -121,9 +121,15 @@ class WinBidStandardFormatParser(AbstractFormatParser):
                 address_text = "".join(part[pre:idx])
 
                 bid_item = common.get_template_bid_item(is_win=True, index=index)
-                amount, is_percent = AbstractFormatParser.parse_amount(
-                    amount_str=price_text
-                )
+                try:
+                    amount, is_percent = AbstractFormatParser.parse_amount(
+                        amount_str=price_text
+                    )
+                except ParseError as e:
+                    if not e.message.startswith("金额解析异常"):
+                        raise e
+                    amount, is_percent = -1, False
+
                 bid_item[BidItemKey.AMOUNT] = amount
                 bid_item[BidItemKey.IS_PERCENT] = is_percent
                 bid_item[BidItemKey.SUPPLIER] = supplier_text
@@ -212,9 +218,13 @@ class WinBidStandardFormatParser(AbstractFormatParser):
         # 中标金额
         if match := WinBidStandardFormatParser.PATTERN_S1_AMOUNT.search(string):
             desc, amount = match.group(1), match.group(2)
-            item[BidItemKey.AMOUNT], item[BidItemKey.IS_PERCENT] = (
-                AbstractFormatParser.parse_amount(amount_str=f"{desc}:{amount}")
-            )
+
+            try:
+                item[BidItemKey.AMOUNT], item[BidItemKey.IS_PERCENT] = AbstractFormatParser.parse_amount(amount_str=f"{desc}:{amount}")
+            except ParseError as e:
+                if not e.message.startswith("金额解析异常"):
+                    raise e
+                item[BidItemKey.AMOUNT], item[BidItemKey.IS_PERCENT] = -1, False
             cnt += 1
 
         if cnt != 3:
